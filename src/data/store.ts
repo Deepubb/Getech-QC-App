@@ -26,7 +26,7 @@ interface AppState {
   deleteMasterList(id: string): Promise<void>;
   /** Downloads the team master list if it changed. Returns a line for the engineer, or null when nothing changed. */
   syncTeam(): Promise<string | null>;
-  publishTeam(lists: ParsedList[], source: string, passcode: string): Promise<{ ok: true; message: string } | { ok: false; error: PublishError }>;
+  publishTeam(lists: ParsedList[], source: string, passcode: string): Promise<{ ok: true; message: string } | { ok: false; error: PublishError; missing?: string[] }>;
   /** Moves a machine in progress onto the current master list for its machine. */
   applyList(evidenceId: string): Promise<void>;
   dismissList(evidenceId: string, hash: string): Promise<void>;

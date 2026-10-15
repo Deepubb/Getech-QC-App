@@ -2,6 +2,7 @@ import { FileSpreadsheet, Loader2, RefreshCw, Trash2, TriangleAlert, Upload, Use
 import { useRef, useState } from 'react';
 import { fmtDate, fmtDateTime, plural } from '../core/format';
 import { diffLists, shotCount, usesFixture, type ParsedList } from '../core/masterList';
+import type { PublishError } from '../data/remote';
 import { useApp } from '../data/store';
 import { ConfirmSheet, Field, Sheet, toast } from './ui';
 
@@ -149,13 +150,7 @@ export function MachineLists() {
               setUpload(null);
               return null;
             }
-            return r.error === 'passcode'
-              ? 'That passcode is not right.'
-              : r.error === 'not_set_up'
-                ? 'Publishing is not set up on Cloudflare yet.'
-                : r.error === 'offline'
-                  ? 'No connection. Try again when you are online.'
-                  : 'Publishing failed. Try again.';
+            return publishMessage(r);
           }}
         />
       ) : null}
@@ -283,4 +278,23 @@ function UploadSheet({
       )}
     </Sheet>
   );
+}
+
+function publishMessage(r: { error: PublishError; missing?: string[] }): string {
+  switch (r.error) {
+    case 'passcode':
+      return 'That passcode is not right.';
+    case 'no_server':
+      return 'Cloudflare is serving the app but not its server script. Check that the latest build in Cloudflare → Deployments finished.';
+    case 'not_set_up': {
+      const parts = (r.missing ?? []).map((m) =>
+        m === 'MASTER' ? 'the storage (KV binding MASTER)' : m === 'PUBLISH_PASSCODE' ? 'the passcode secret PUBLISH_PASSCODE' : m,
+      );
+      return `Cloudflare is missing ${parts.join(' and ') || 'part of its set-up'}.`;
+    }
+    case 'offline':
+      return 'No connection. Try again when you are online.';
+    default:
+      return 'Publishing failed. Try again.';
+  }
 }

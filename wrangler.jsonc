@@ -4,6 +4,8 @@
   "name": "getech-qc-app",
   "main": "worker/index.ts",
   "compatibility_date": "2025-09-01",
+  // Keep variables added in the Cloudflare dashboard (such as the passcode) when deploying from Git.
+  "keep_vars": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

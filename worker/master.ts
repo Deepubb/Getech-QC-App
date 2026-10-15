@@ -67,14 +67,17 @@ function samePasscode(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/** What is missing on Cloudflare, named so the app can say exactly what to fix. */
+const missing = (env: Env, needPasscode: boolean) => [...(env.MASTER ? [] : ['MASTER']), ...(needPasscode && !env.PUBLISH_PASSCODE ? ['PUBLISH_PASSCODE'] : [])];
+
 export async function onRequestGet({ env }: Context): Promise<Response> {
-  if (!env.MASTER) return json({ error: 'not_set_up' }, 503);
+  if (!env.MASTER) return json({ error: 'not_set_up', missing: missing(env, true) }, 503);
   const stored = await env.MASTER.get(KEY);
   return stored ? new Response(stored, { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } }) : json({ error: 'none' }, 404);
 }
 
 export async function onRequestPost({ request, env }: Context): Promise<Response> {
-  if (!env.MASTER || !env.PUBLISH_PASSCODE) return json({ error: 'not_set_up' }, 503);
+  if (!env.MASTER || !env.PUBLISH_PASSCODE) return json({ error: 'not_set_up', missing: missing(env, true) }, 503);
   if (!samePasscode(request.headers.get('x-publish-passcode') ?? '', env.PUBLISH_PASSCODE)) return json({ error: 'passcode' }, 401);
   const text = await request.text();
   if (text.length > MAX_BODY) return json({ error: 'too_large' }, 413);

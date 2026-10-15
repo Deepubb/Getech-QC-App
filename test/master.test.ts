@@ -13,7 +13,10 @@ const get = (env: Env) => onRequestGet({ env, request: new Request('https://x/ap
 describe('/api/master', () => {
   it('says so when Cloudflare is not set up yet', async () => {
     expect((await get({})).status).toBe(503);
-    expect((await post({ MASTER: kv() }, { lists: LISTS })).status).toBe(503);
+    const r = await post({ MASTER: kv() }, { lists: LISTS });
+    expect(r.status).toBe(503);
+    expect(await r.json()).toEqual({ error: 'not_set_up', missing: ['PUBLISH_PASSCODE'] });
+    expect(await (await post({ PUBLISH_PASSCODE: 'x' }, { lists: LISTS })).json()).toEqual({ error: 'not_set_up', missing: ['MASTER'] });
   });
 
   it('has nothing until someone publishes', async () => {
