@@ -4,7 +4,7 @@ import { fmtDate, fmtDateTime, plural } from '../core/format';
 import { diffLists, shotCount, usesFixture, type ParsedList } from '../core/masterList';
 import type { PublishError } from '../data/remote';
 import { useApp } from '../data/store';
-import { ConfirmSheet, Field, Sheet, toast } from './ui';
+import { ConfirmSheet, Sheet, toast } from './ui';
 
 interface Upload {
   file: string;
@@ -12,15 +12,6 @@ interface Upload {
   skipped: string[];
   mode: 'team' | 'phone';
 }
-
-const PASSCODE_KEY = 'getech-qc-publish-passcode';
-const readPasscode = () => {
-  try {
-    return localStorage.getItem(PASSCODE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-};
 
 /** Settings section: the team master list and the machines this phone knows. */
 export function MachineLists() {
@@ -143,8 +134,8 @@ export function MachineLists() {
             toast(`${plural(upload.lists.length, 'machine')} saved on this phone. The next team update replaces them.`, 'good');
             setUpload(null);
           }}
-          onPublish={async (passcode) => {
-            const r = await publishTeam(upload.lists, upload.file, passcode);
+          onPublish={async () => {
+            const r = await publishTeam(upload.lists, upload.file);
             if (r.ok) {
               toast(r.message, 'good');
               setUpload(null);
@@ -180,11 +171,9 @@ function UploadSheet({
   upload: Upload;
   onClose: () => void;
   onPhone: () => Promise<void>;
-  onPublish: (passcode: string) => Promise<string | null>;
+  onPublish: () => Promise<string | null>;
 }) {
   const masterLists = useApp((s) => s.masterLists);
-  const [passcode, setPasscode] = useState(readPasscode);
-  const [remember, setRemember] = useState(() => !!readPasscode());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const team = upload.mode === 'team';
@@ -193,13 +182,7 @@ function UploadSheet({
   async function publish() {
     setBusy(true);
     setError(null);
-    try {
-      if (remember) localStorage.setItem(PASSCODE_KEY, passcode);
-      else localStorage.removeItem(PASSCODE_KEY);
-    } catch {
-      /* storage blocked: the passcode is just not remembered */
-    }
-    setError(await onPublish(passcode));
+    setError(await onPublish());
     setBusy(false);
   }
 
@@ -253,24 +236,12 @@ function UploadSheet({
       <p className="hint">Photo evidence already started keeps its names until someone taps Apply new names on that machine.</p>
 
       {team ? (
-        <form
-          className="stack"
-          onSubmit={(ev) => {
-            ev.preventDefault();
-            if (passcode) void publish();
-          }}
-        >
-          <Field label="Team passcode" hint={error ? <span className="bad">{error}</span> : 'Set once in Cloudflare. Ask your QC lead.'}>
-            <input type="password" value={passcode} onChange={(ev) => setPasscode(ev.target.value)} autoComplete="current-password" />
-          </Field>
-          <label className="check small">
-            <input type="checkbox" checked={remember} onChange={(ev) => setRemember(ev.target.checked)} />
-            <span>Remember the passcode on this device</span>
-          </label>
-          <button className="btn btn-primary btn-block" type="submit" disabled={!passcode || busy}>
+        <>
+          {error ? <p className="hint bad">{error}</p> : null}
+          <button className="btn btn-primary btn-block" disabled={busy} onClick={() => void publish()}>
             {busy ? <Loader2 className="spin" /> : <Upload />} Publish {plural(upload.lists.length, 'machine')} to everyone
           </button>
-        </form>
+        </>
       ) : (
         <button className="btn btn-primary btn-block" onClick={() => void onPhone()}>
           Save {plural(upload.lists.length, 'machine')} on this phone
@@ -282,13 +253,11 @@ function UploadSheet({
 
 function publishMessage(r: { error: PublishError; missing?: string[] }): string {
   switch (r.error) {
-    case 'passcode':
-      return 'That passcode is not right.';
     case 'no_server':
       return 'Cloudflare is serving the app but not its server script. Check that the latest build in Cloudflare → Deployments finished.';
     case 'not_set_up': {
       const parts = (r.missing ?? []).map((m) =>
-        m === 'MASTER' ? 'the storage (KV binding MASTER)' : m === 'PUBLISH_PASSCODE' ? 'the passcode secret PUBLISH_PASSCODE' : m,
+        m === 'MASTER' ? 'the storage (KV binding MASTER)' : m,
       );
       return `Cloudflare is missing ${parts.join(' and ') || 'part of its set-up'}.`;
     }

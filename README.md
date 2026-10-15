@@ -2,7 +2,7 @@
 
 Installable web app (PWA) for QC buyoff photo evidence on iPhone and Android.
 
-1. On a PC, open the app, go to **Settings** and **publish** the team master Excel with the team passcode. Each sheet is one machine, named after the sheet. Every phone picks up the new list when the app opens.
+1. On a PC, open the app, go to **Settings** and **publish** the team master Excel. Each sheet is one machine, named after the sheet. Every phone picks up the new list when the app opens.
 2. Start photo evidence for a machine and type its FT number.
 3. Tap each photo name and take the photo; the app names it. Items can be marked not applicable, get extra photos (`_2`, `_3`) or be added on site.
 4. Export one zip laid out like the sheet. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
@@ -34,12 +34,11 @@ The app is a Cloudflare Worker: `worker/index.ts` serves the built app from `dis
 
 ### Team master list (one-time)
 
-- The KV storage bound as `MASTER` is created by Cloudflare on the first deploy.
-- Add the passcode: Worker → **Settings → Variables and Secrets → Add**, type **Secret**, name `PUBLISH_PASSCODE`, value the team passcode (long, at least 10 characters). It takes effect straight away.
+The KV storage bound as `MASTER` is created by Cloudflare on the first deploy; nothing else is needed.
 
-Anyone can read the list; only someone with the passcode can publish. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
+Anyone using the app can read and publish the list. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
 
-To try it locally: `npm run build`, put `PUBLISH_PASSCODE=...` in `.dev.vars`, then `npx wrangler dev`.
+To try it locally: `npm run build`, then `npx wrangler dev`.
 
 `public/_headers` stops the service worker from being cached, so phones pick up new versions. Phones show an **Update** prompt when a new version is ready.
 
@@ -61,7 +60,7 @@ src/
 └── screens/      One file per screen
 worker/
 ├── index.ts      Cloudflare Worker: serves the app and /api/master
-└── master.ts     Team master list (KV storage, passcode check)
+└── master.ts     Team master list (KV storage)
 ```
 
 ## Master Excel

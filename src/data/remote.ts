@@ -15,26 +15,24 @@ export async function fetchTeamMaster(): Promise<TeamMaster | null> {
   }
 }
 
-export type PublishError = 'passcode' | 'not_set_up' | 'no_server' | 'offline' | 'failed';
+export type PublishError = 'not_set_up' | 'no_server' | 'offline' | 'failed';
 
 export async function publishTeamMaster(
   lists: ParsedList[],
   source: string,
   publishedBy: string,
-  passcode: string,
 ): Promise<{ ok: true } | { ok: false; error: PublishError; missing?: string[] }> {
   let r: Response;
   try {
     r = await fetch(URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-publish-passcode': passcode },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ lists: lists.map(({ machine, folders }) => ({ machine, folders })), source, publishedBy }),
     });
   } catch {
     return { ok: false, error: 'offline' };
   }
   if (r.ok) return { ok: true };
-  if (r.status === 401) return { ok: false, error: 'passcode' };
   const body = r.headers.get('content-type')?.includes('application/json') ? await r.json().catch(() => null) : null;
   // The Worker script always answers with JSON. Anything else means only the app's files are being served.
   if (!body) return { ok: false, error: 'no_server' };

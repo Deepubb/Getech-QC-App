@@ -2,9 +2,9 @@
  * /api/master: the team's master list of photo names.
  *
  * GET  returns the latest published list (404 until someone publishes).
- * POST publishes a new list. It needs the team passcode in the X-Publish-Passcode header.
+ * POST publishes a new list. Anyone using the app can publish; the previous list is kept as a backup.
  *
- * Needs a KV namespace bound as MASTER (see wrangler.jsonc) and a secret PUBLISH_PASSCODE.
+ * Needs a KV namespace bound as MASTER (see wrangler.jsonc).
  * The Excel is read on the publisher's PC; only machine, folder and photo names are sent here.
  */
 
@@ -15,7 +15,6 @@ interface KV {
 
 export interface Env {
   MASTER?: KV;
-  PUBLISH_PASSCODE?: string;
 }
 
 export interface Context {
@@ -58,27 +57,17 @@ export function validLists(v: unknown): v is List[] {
   return true;
 }
 
-/** Compares without leaking how much of the passcode matched. */
-function samePasscode(a: string, b: string): boolean {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  let diff = x.length ^ y.length;
-  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
-  return diff === 0;
-}
-
 /** What is missing on Cloudflare, named so the app can say exactly what to fix. */
-const missing = (env: Env, needPasscode: boolean) => [...(env.MASTER ? [] : ['MASTER']), ...(needPasscode && !env.PUBLISH_PASSCODE ? ['PUBLISH_PASSCODE'] : [])];
+const notSetUp = () => json({ error: 'not_set_up', missing: ['MASTER'] }, 503);
 
 export async function onRequestGet({ env }: Context): Promise<Response> {
-  if (!env.MASTER) return json({ error: 'not_set_up', missing: missing(env, true) }, 503);
+  if (!env.MASTER) return notSetUp();
   const stored = await env.MASTER.get(KEY);
   return stored ? new Response(stored, { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } }) : json({ error: 'none' }, 404);
 }
 
 export async function onRequestPost({ request, env }: Context): Promise<Response> {
-  if (!env.MASTER || !env.PUBLISH_PASSCODE) return json({ error: 'not_set_up', missing: missing(env, true) }, 503);
-  if (!samePasscode(request.headers.get('x-publish-passcode') ?? '', env.PUBLISH_PASSCODE)) return json({ error: 'passcode' }, 401);
+  if (!env.MASTER) return notSetUp();
   const text = await request.text();
   if (text.length > MAX_BODY) return json({ error: 'too_large' }, 413);
   let body: { lists?: unknown; source?: unknown; publishedBy?: unknown };

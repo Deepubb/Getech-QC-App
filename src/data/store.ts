@@ -26,7 +26,7 @@ interface AppState {
   deleteMasterList(id: string): Promise<void>;
   /** Downloads the team master list if it changed. Returns a line for the engineer, or null when nothing changed. */
   syncTeam(): Promise<string | null>;
-  publishTeam(lists: ParsedList[], source: string, passcode: string): Promise<{ ok: true; message: string } | { ok: false; error: PublishError; missing?: string[] }>;
+  publishTeam(lists: ParsedList[], source: string): Promise<{ ok: true; message: string } | { ok: false; error: PublishError; missing?: string[] }>;
   /** Moves a machine in progress onto the current master list for its machine. */
   applyList(evidenceId: string): Promise<void>;
   dismissList(evidenceId: string, hash: string): Promise<void>;
@@ -167,8 +167,8 @@ export const useApp = create<AppState>((set, get) => ({
     return changes.length ? `Master list updated: ${changes.join(', ')}` : null;
   },
 
-  async publishTeam(lists, source, passcode) {
-    const r = await publishTeamMaster(lists, source, get().settings.engineerName, passcode);
+  async publishTeam(lists, source) {
+    const r = await publishTeamMaster(lists, source, get().settings.engineerName);
     if (!r.ok) return r;
     await get().syncTeam();
     return { ok: true, message: `Published to the team: ${plural(lists.length, 'machine')}.` };
