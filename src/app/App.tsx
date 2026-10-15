@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, type RoutesProps } from 'react-router-dom';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastHost } from '../components/ui';
 import { UpdatePrompt } from '../components/UpdatePrompt';
 import { useApp } from '../data/store';
@@ -22,6 +23,16 @@ function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => window.scrollTo(0, 0), [pathname]);
   return null;
+}
+
+/** A fresh boundary per screen, so moving to another screen clears an earlier error. */
+function ScreenBoundary({ children }: Pick<RoutesProps, 'children'>) {
+  const { pathname } = useLocation();
+  return (
+    <ErrorBoundary key={pathname}>
+      <Routes>{children}</Routes>
+    </ErrorBoundary>
+  );
 }
 
 const INSTALL_SKIP = 'getech-qc-install-skipped';
@@ -70,12 +81,17 @@ export function App() {
       />
     );
   }
-  if (!settings.engineerName) return <Welcome />;
+  if (!settings.engineerName)
+    return (
+      <ErrorBoundary>
+        <Welcome />
+      </ErrorBoundary>
+    );
 
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <Routes>
+      <ScreenBoundary>
         <Route path="/" element={<Home />} />
         <Route path="/checklists/new" element={<NewChecklist />} />
         <Route path="/checklists/new/details" element={<ChecklistDetails />} />
@@ -90,7 +106,7 @@ export function App() {
         <Route path="/templates" element={<Templates />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </ScreenBoundary>
       <ToastHost />
       <UpdatePrompt />
     </BrowserRouter>
