@@ -8,7 +8,8 @@ import './styles.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
-import { watchProblems } from './data/problemLog';
+import { ErrorBoundary, reloadOnce } from './components/ErrorBoundary';
+import { logProblem, watchProblems } from './data/problemLog';
 
 watchProblems();
 
@@ -23,8 +24,21 @@ document.addEventListener(
   { passive: false },
 );
 
-createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root')!;
+createRoot(root, {
+  // Last line of defence: if an error gets past every boundary, React empties the page.
+  // Reload once; if that already happened, leave a message and a button instead of a blank screen.
+  onUncaughtError(error) {
+    logProblem(`Uncaught: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`);
+    if (reloadOnce()) return;
+    root.innerHTML =
+      '<div class="gate" role="alert"><h1>Something went wrong</h1><p>Your inspections and photos are safe on this phone.</p>' +
+      '<button class="btn btn-amber btn-block" onclick="location.reload()">Reload</button></div>';
+  },
+}).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

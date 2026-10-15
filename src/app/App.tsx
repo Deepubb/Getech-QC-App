@@ -26,11 +26,11 @@ function ScrollToTop() {
   return null;
 }
 
-/** A fresh boundary per screen, so moving to another screen clears an earlier error. */
+/** Catches a crash on one screen; moving to another screen clears it. */
 function ScreenBoundary({ children }: Pick<RoutesProps, 'children'>) {
   const { pathname } = useLocation();
   return (
-    <ErrorBoundary key={pathname}>
+    <ErrorBoundary resetKey={pathname}>
       <Routes>{children}</Routes>
     </ErrorBoundary>
   );

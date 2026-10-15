@@ -12,25 +12,39 @@ function isForeignDomError(err: Error): boolean {
   return err.name === 'NotFoundError' || /removeChild|insertBefore|not a child of this node/i.test(err.message);
 }
 
-export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+/** Reloads the page unless it already did so in the last 10 seconds, so a crash can never loop. */
+export function reloadOnce(): boolean {
+  let last = 0;
+  try {
+    last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+  } catch {
+    /* storage blocked: reload anyway, the browser stops a tight loop */
+  }
+  if (Date.now() - last <= 10_000) return false;
+  window.location.reload();
+  return true;
+}
+
+type Props = { children: ReactNode; resetKey?: string };
+
+export class ErrorBoundary extends Component<Props, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
 
+  componentDidUpdate(prev: Props) {
+    // Moving to another screen clears the error. The boundary itself stays mounted, so an error
+    // thrown while the old screen is being removed still lands here and not on a blank page.
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null });
+  }
+
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(error, info.componentStack);
     logProblem(`${error.name}: ${error.message}`);
-    if (!isForeignDomError(error)) return;
-    let last = 0;
-    try {
-      last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
-      sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
-    } catch {
-      /* storage blocked: fall through to the screen below */
-    }
-    if (Date.now() - last > 10_000) window.location.reload();
+    if (isForeignDomError(error)) reloadOnce();
   }
 
   render() {
