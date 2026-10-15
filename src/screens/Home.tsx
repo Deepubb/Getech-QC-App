@@ -1,32 +1,22 @@
-import { Camera, ClipboardCheck, ClipboardList, Images, Plus, TriangleAlert } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChecklistChip, EvidenceChip } from '../components/StatusChip';
-import { ResultBar } from '../components/ResultBar';
-import { Thumb } from '../components/Thumb';
+import { Camera, FileSpreadsheet, Plus, TriangleAlert } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ProgressBar } from '../components/ProgressBar';
+import { EvidenceChip } from '../components/StatusChip';
 import { TabBar } from '../components/TabBar';
+import { Thumb } from '../components/Thumb';
 import { Empty } from '../components/ui';
+import { allItems, evidenceBytes, evidencePhotoCount, evidenceProgress } from '../core/evidence';
 import { fmtSize, plural, timeAgo } from '../core/format';
-import { checklistLabel, daysSince, doneCount, evidenceLabel, photoBytes, photoCount } from '../core/rules';
+import { daysSince, evidenceLabel } from '../core/rules';
 import { useApp } from '../data/store';
 
 export function Home() {
-  const [params, setParams] = useSearchParams();
-  const mode = params.get('m') === 'evidence' ? 'evidence' : 'checklists';
   const nav = useNavigate();
-  const { checklists, evidence, settings } = useApp();
-
-  const sortedC = [...checklists].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const sortedE = [...evidence].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const unexported = [
-    ...checklists.filter((c) => checklistLabel(c) === 'completed').map((c) => c.updatedAt),
-    ...evidence.filter((e) => evidenceLabel(e) === 'not_exported').map((e) => e.updatedAt),
-  ];
-  const oldest = unexported.length ? Math.max(...unexported.map((d) => daysSince(d))) : 0;
-  const openChecklists = checklists.filter((c) => c.status === 'in_progress').length;
-  const totalPhotos = evidence.reduce((a, e) => a + photoCount(e), 0);
-
+  const { evidence, masterLists, settings } = useApp();
+  const sorted = [...evidence].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const unexported = evidence.filter((e) => evidenceLabel(e) === 'not_exported');
+  const oldest = unexported.length ? Math.max(...unexported.map((e) => daysSince(e.updatedAt))) : 0;
   const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-  const select = (m: 'checklists' | 'evidence') => setParams(m === 'evidence' ? { m } : {}, { replace: true });
 
   return (
     <div className="shell">
@@ -34,33 +24,11 @@ export function Home() {
         <div className="greet">
           <div>
             <div className="wordmark">
-              GeTech <b>QC</b>
+              GeTech <b>QC</b> · Photo evidence
             </div>
             <h1>Hi, {settings.engineerName || 'there'}</h1>
             <div className="date">{today}</div>
           </div>
-        </div>
-        <div className="modules" role="tablist" aria-label="Work type">
-          <button role="tab" aria-selected={mode === 'checklists'} className={`module ${mode === 'checklists' ? 'active' : ''}`} onClick={() => select('checklists')}>
-            <ClipboardCheck />
-            <span className="count">{checklists.length}</span>
-            <span>
-              <span className="name">QC checklists</span>
-              <span className="hint" style={{ display: 'block' }}>
-                {openChecklists} in progress
-              </span>
-            </span>
-          </button>
-          <button role="tab" aria-selected={mode === 'evidence'} className={`module ${mode === 'evidence' ? 'active' : ''}`} onClick={() => select('evidence')}>
-            <Images />
-            <span className="count">{evidence.length}</span>
-            <span>
-              <span className="name">Photo evidence</span>
-              <span className="hint" style={{ display: 'block' }}>
-                {plural(totalPhotos, 'photo')}
-              </span>
-            </span>
-          </button>
         </div>
       </section>
 
@@ -69,68 +37,48 @@ export function Home() {
           <div className="banner" role="status">
             <TriangleAlert />
             <span>
-              <b>{plural(unexported.length, 'item')} not exported</b>
-              {oldest >= 3 ? `, the oldest ${oldest} days ago` : ''}. The exported file is your only backup, so export before clearing browser data.
+              <b>{plural(unexported.length, 'machine')} not exported</b>
+              {oldest >= 3 ? `, the oldest ${oldest} days ago` : ''}. The exported zip is your only backup, so export before clearing browser data.
             </span>
           </div>
         ) : null}
 
-        {mode === 'checklists' ? (
-          sortedC.length === 0 ? (
-            <Empty icon={<ClipboardList />} title="No QC checklists yet">
-              <p>Start one from a saved template, an Excel checklist, or build it by hand.</p>
-            </Empty>
-          ) : (
-            sortedC.map((c) => (
-              <Link key={c.id} to={`/checklists/${c.id}`} className="card card-link stack">
-                <div className="between" style={{ alignItems: 'flex-start' }}>
-                  <div className="grow">
-                    <h3 style={{ fontSize: 19 }}>{c.machineName}</h3>
-                    <div className="mono small muted wrap-anywhere">
-                      {c.machineCode}
-                      {c.cwo ? ` · ${c.cwo}` : ''}
-                    </div>
-                  </div>
-                  <ChecklistChip c={c} />
-                </div>
-                <ResultBar c={c} />
-                <div className="between small muted tnum">
-                  <span>
-                    {doneCount(c)} of {c.items.length} done
-                  </span>
-                  <span>Updated {timeAgo(c.updatedAt)}</span>
-                </div>
-              </Link>
-            ))
-          )
-        ) : sortedE.length === 0 ? (
+        {!sorted.length && !masterLists.length ? (
+          <Empty icon={<FileSpreadsheet />} title="Add your machine lists first">
+            <p>Upload the master Excel in Settings. Each sheet is a machine; its columns become folders and the names below become photo names.</p>
+            <Link className="btn btn-primary" to="/settings">
+              Go to Settings
+            </Link>
+          </Empty>
+        ) : !sorted.length ? (
           <Empty icon={<Camera />} title="No photo evidence yet">
-            <p>Start one per machine, take photos into categories like Safety or Functional, name each one, and export them as a zip.</p>
+            <p>Pick a machine, type its FT number, then tap each photo name to take it. The zip comes out in the same folders as your Excel.</p>
           </Empty>
         ) : (
-          sortedE.map((e) => {
-            const recent = e.categories.flatMap((c) => c.photos).slice(-4).reverse();
+          sorted.map((e) => {
+            const p = evidenceProgress(e);
+            const n = evidencePhotoCount(e);
+            const recent = allItems(e).flatMap((i) => i.photos).sort((a, b) => b.takenAt.localeCompare(a.takenAt)).slice(0, 5);
             return (
               <Link key={e.id} to={`/evidence/${e.id}`} className="card card-link stack">
                 <div className="between" style={{ alignItems: 'flex-start' }}>
                   <div className="grow">
-                    <h3 style={{ fontSize: 19 }}>{e.title || e.machineCode || 'Untitled evidence'}</h3>
-                    <div className="mono small muted wrap-anywhere">{[e.machineCode, e.cwo].filter(Boolean).join(' · ') || 'No machine code'}</div>
+                    <h3 style={{ fontSize: 19 }}>{e.machine}</h3>
+                    <div className="mono small muted wrap-anywhere">{e.ft ? `FT ${e.ft}` : 'No FT number'}</div>
                   </div>
                   <EvidenceChip e={e} />
                 </div>
+                <ProgressBar p={p} />
                 {recent.length ? (
                   <div className="strip">
-                    {recent.map((p) => (
-                      <Thumb key={p.id} id={p.id} />
+                    {recent.map((ph) => (
+                      <Thumb key={ph.id} id={ph.id} />
                     ))}
                   </div>
                 ) : null}
                 <div className="between small muted tnum">
-                  <span>
-                    {plural(photoCount(e), 'photo')} · {plural(e.categories.filter((c) => c.photos.length).length, 'category', 'categories')}
-                  </span>
-                  <span>{photoCount(e) ? fmtSize(photoBytes(e)) : `Updated ${timeAgo(e.updatedAt)}`}</span>
+                  <span>{p.total ? `${p.taken} of ${p.total} taken${p.missing ? '' : ' · done'}` : plural(n, 'photo')}</span>
+                  <span>{n ? fmtSize(evidenceBytes(e)) : `Started ${timeAgo(e.createdAt)}`}</span>
                 </div>
               </Link>
             );
@@ -138,9 +86,9 @@ export function Home() {
         )}
       </main>
 
-      <button className="fab" onClick={() => nav(mode === 'checklists' ? '/checklists/new' : '/evidence/new')}>
+      <button className="fab" onClick={() => nav('/evidence/new')}>
         <Plus />
-        {mode === 'checklists' ? 'New checklist' : 'New photo evidence'}
+        New photo evidence
       </button>
       <TabBar />
     </div>

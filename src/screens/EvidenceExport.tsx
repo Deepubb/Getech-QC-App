@@ -1,12 +1,12 @@
-import { Download, FileArchive, Folder, Loader2, Share2, TriangleAlert } from 'lucide-react';
+import { Download, FileArchive, Loader2, Share2, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { EvidenceChip } from '../components/StatusChip';
 import { AppBar, toast } from '../components/ui';
-import { evidenceProblems, safeName, zipBaseName } from '../core/evidence';
+import { evidencePhotoCount, isMissing, itemName, itemPath, setTitle, zipBaseName, zipClashes, zipEntries } from '../core/evidence';
 import { fmtDateTime, fmtSize, plural } from '../core/format';
 import { nowISO } from '../core/ids';
-import { photoCount } from '../core/rules';
+import { treeLines } from '../core/tree';
 import { getPhoto } from '../data/db';
 import { useApp } from '../data/store';
 import { buildEvidencePack, type EvidencePack } from '../export/evidencePack';
@@ -20,13 +20,13 @@ export function EvidenceExport() {
   const [progress, setProgress] = useState('Preparing…');
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const problems = e ? evidenceProblems(e) : [];
-  const blocked = problems.length > 0;
+  const clashes = e ? zipClashes(e) : [];
+  const blocked = clashes.length > 0;
 
   // Build the zip as soon as the screen opens, so Share can run straight from the tap.
   const version = e?.updatedAt;
   useEffect(() => {
-    if (!e || !photoCount(e) || blocked) return;
+    if (!e || !evidencePhotoCount(e) || blocked) return;
     let alive = true;
     setPack(null);
     setError(null);
@@ -40,14 +40,16 @@ export function EvidenceExport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, version, settings.splitMB, blocked]);
 
-  if (!e) return <Navigate to="/?m=evidence" replace />;
-  const folders = e.categories.filter((c) => c.photos.length);
+  if (!e) return <Navigate to="/" replace />;
+  const n = evidencePhotoCount(e);
+  const missing = e.folders.map((f) => ({ f, items: f.items.filter(isMissing) })).filter((x) => x.items.length);
+  const missingCount = missing.reduce((a, x) => a + x.items.length, 0);
   const zipFiles = pack ? pack.parts.map((p) => toFile(p.blob, p.name, 'application/zip')) : [];
   const shareable = zipFiles.length > 0 && canShareFiles(zipFiles);
   const markExported = () => updateEvidence(e.id, (d) => void (d.exportedAt = nowISO()), { touch: false });
 
   async function onShare() {
-    const r = await shareFiles(zipFiles, `${e!.title || e!.machineCode} photos`);
+    const r = await shareFiles(zipFiles, `${setTitle(e!)} photos`);
     if (r === 'shared') {
       await markExported();
       toast('Shared. Marked as exported.', 'good');
@@ -67,60 +69,48 @@ export function EvidenceExport() {
 
   return (
     <div className="shell">
-      <AppBar title="Export photos" sub={e.title || e.machineCode} back={`/evidence/${e.id}`} />
+      <AppBar title="Export photos" sub={setTitle(e)} back={`/evidence/${e.id}`} />
       <main className="content">
-        <section className="card stack">
-          <div className="between">
-            <b>
-              {plural(photoCount(e), 'photo')} in {plural(folders.length, 'folder')}
-            </b>
-            <EvidenceChip e={e} />
-          </div>
-          <div className="eyebrow">Inside {zipBaseName(e)}.zip</div>
-          <div className="tree">
-            {folders
-              .flatMap((c, ci) => {
-                const lastFolder = ci === folders.length - 1;
-                const shown = c.photos.slice(0, 6);
-                return [
-                  `${lastFolder ? '└─' : '├─'} ${safeName(c.name)}/`,
-                  ...shown.map((p, pi) => `${lastFolder ? '   ' : '│  '}${pi === shown.length - 1 && c.photos.length <= 6 ? '└─' : '├─'} ${safeName(p.name) || '(needs a name)'}.jpg`),
-                  ...(c.photos.length > 6 ? [`${lastFolder ? '   ' : '│  '}└─ … ${c.photos.length - 6} more`] : []),
-                ];
-              })
-              .join('\n') || 'No photos yet.'}
-          </div>
-          <p className="hint">One folder per category, each photo named exactly as you typed it. Nothing else is added.</p>
-        </section>
-
-        {blocked ? (
-          <section className="stack">
-            <div className="banner bad">
+        {missingCount ? (
+          <details className="banner missing">
+            <summary>
               <TriangleAlert />
               <span>
-                <b>Fix {plural(problems.length, 'name')} first.</b> Every photo needs a name, and names must be unique within a category.
+                <b>{plural(missingCount, 'photo')} not taken yet.</b> You can still export; tap to see which.
               </span>
-            </div>
-            <div className="list">
-              {problems.map((p, i) => {
-                const cat = e.categories.find((c) => c.id === p.categoryId);
-                return (
-                  <Link key={i} className="li" to={`/evidence/${e.id}/c/${p.categoryId}`}>
-                    <Folder className="muted" />
-                    <span className="t">
-                      {p.message}
-                      <div className="s">Open {cat?.name || 'the category'} to fix it</div>
-                    </span>
-                    <span />
+            </summary>
+            <div className="stack" style={{ gap: 10, marginTop: 10 }}>
+              {missing.map(({ f, items }) => (
+                <div key={f.id}>
+                  <Link to={`/evidence/${e.id}/f/${f.id}`}>
+                    <b>{f.name}</b> · {items.length}
                   </Link>
-                );
-              })}
+                  <ul className="small">
+                    {items.map((i) => (
+                      <li key={i.id} className="wrap-anywhere">
+                        {[...itemPath(i, e.ft), itemName(i, e.ft)].join(' › ')}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-          </section>
+          </details>
+        ) : null}
+
+        {blocked ? (
+          <div className="banner bad">
+            <TriangleAlert />
+            <span>
+              <b>Two photos would get the same file name:</b> {clashes.join(', ')}. Remove or rename the photo added on site, then export.
+            </span>
+          </div>
         ) : (
           <section className="card stack">
             {error ? (
               <div className="banner bad">Could not build the zip: {error}</div>
+            ) : !n ? (
+              <p className="muted">No photos yet.</p>
             ) : !pack ? (
               <div className="row muted">
                 <Loader2 className="spin" /> {progress}
@@ -164,6 +154,16 @@ export function EvidenceExport() {
             )}
           </section>
         )}
+
+        <section className="card stack">
+          <div className="between">
+            <b>{plural(n, 'photo')}</b>
+            <EvidenceChip e={e} />
+          </div>
+          <div className="eyebrow">Inside {zipBaseName(e)}.zip</div>
+          <div className="tree">{treeLines(zipEntries(e).map((z) => z.path)).join('\n') || 'No photos yet.'}</div>
+          <p className="hint">The same folders and names as the master list. Nothing else is added.</p>
+        </section>
       </main>
     </div>
   );

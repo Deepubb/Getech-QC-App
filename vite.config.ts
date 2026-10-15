@@ -18,7 +18,7 @@ export default defineConfig({
       manifest: {
         name: 'Getech QC',
         short_name: 'Getech QC',
-        description: 'QC buyoff checklists and photo evidence, offline on your phone.',
+        description: 'QC buyoff photo evidence, named and foldered from your machine list, offline on your phone.',
         theme_color: '#13233f',
         background_color: '#0b0e10',
         display: 'standalone',

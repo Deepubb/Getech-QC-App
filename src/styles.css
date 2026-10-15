@@ -121,7 +121,7 @@ p { margin: 0; }
   background: var(--surface);
   border-top: 1px solid var(--line); padding-bottom: var(--safe-bottom);
 }
-.tabbar nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tabbar nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, 1fr); }
 .tabbar a {
   min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 500; position: relative;
@@ -342,3 +342,20 @@ p { margin: 0; }
 .catcard h3 { font-size: 18px; }
 .gate .logo-plate { align-self: flex-start; background: #ffffff; border-radius: 14px; padding: 10px 14px; }
 .gate .logo-plate img { display: block; height: 44px; width: auto; max-width: 100%; object-fit: contain; }
+
+/* ── Photo list (folder screen) ────────────────────── */
+.item-row { grid-template-columns: 1fr auto; padding: 0 6px 0 0; gap: 0; }
+.item-main {
+  display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; padding: 10px 8px 10px 12px;
+  background: transparent; border: 0; text-align: left; color: inherit; cursor: pointer; min-height: 70px; font: inherit; width: 100%;
+}
+.item-main:disabled { opacity: 0.6; }
+.item-row.next { background: var(--amber-weak); box-shadow: inset 4px 0 0 var(--amber); }
+.item-row .t b { font-weight: 600; font-size: 15px; }
+.todo-slot { border-color: color-mix(in srgb, var(--amber) 70%, var(--line)); color: var(--warn); }
+.ok-text { color: var(--ok); font-weight: 600; }
+.banner.missing { display: block; }
+.banner.missing summary { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; list-style: none; }
+.banner.missing summary::-webkit-details-marker { display: none; }
+.banner.missing ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink); }
+.banner.missing a { color: inherit; }

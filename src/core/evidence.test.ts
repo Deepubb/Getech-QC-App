@@ -1,66 +1,85 @@
 import { describe, expect, it } from 'vitest';
-import { categoryTaken, evidenceProblems, nameTaken, safeName, toTake, zipBaseName, zipEntries } from './evidence';
-import type { EvidenceCategory, EvidenceSet } from './types';
+import { groupByPath, nameClash, nextMissing, photoFileName, progressOf, safeName, zipBaseName, zipClashes, zipEntries } from './evidence';
+import { treeLines } from './tree';
+import type { EvidenceItem, EvidenceSet } from './types';
 
-const ph = (id: string, name: string) => ({ id, name, takenAt: '2026-10-15T08:00:00Z', bytes: 100 });
-const cat = (id: string, name: string, photos: [string, string][], planned: string[] = []): EvidenceCategory => ({ id, name, planned, photos: photos.map(([pid, n]) => ph(pid, n)) });
-const set = (categories: EvidenceCategory[]): EvidenceSet => ({
-  id: 'e', title: 'Conveyor A', machineCode: 'CONV-001', cwo: 'CWO-2041', customer: '', engineer: '',
-  createdAt: '', updatedAt: '', deviceId: '', exportedAt: null, categories,
+const ph = (id: string) => ({ id, takenAt: '2026-10-15T08:00:00Z', bytes: 100 });
+const item = (id: string, name: string, path: string[] = [], photos: string[] = [], o: Partial<EvidenceItem> = {}): EvidenceItem => ({
+  id, path, name, extra: false, na: false, photos: photos.map(ph), ...o,
+});
+const set = (folders: [string, EvidenceItem[]][], ft = 'FT1234'): EvidenceSet => ({
+  id: 'e', machine: 'SSDLV', ft, engineer: '', createdAt: '', updatedAt: '', deviceId: '', exportedAt: null,
+  folders: folders.map(([name, items], i) => ({ id: `f${i}`, name, items })),
 });
 
 describe('safeName', () => {
-  it('keeps what the engineer typed, including spaces and brackets', () => {
+  it('keeps what was written, including spaces and brackets', () => {
     expect(safeName('Emergency stop button (left)')).toBe('Emergency stop button (left)');
   });
   it('drops only characters phones and PCs refuse in file names', () => {
     expect(safeName('Belt: tension / left?')).toBe('Belt tension left');
     expect(safeName('  E-stop.jpg ')).toBe('E-stop');
-    expect(safeName('...')).toBe('');
-  });
-});
-
-describe('names within a category', () => {
-  const c = cat('c', 'Safety', [['1', 'E-stop'], ['2', '']], ['E-stop', 'Guard door', 'Light curtain']);
-  it('flags a name already used, ignoring case and the photo being renamed', () => {
-    expect(nameTaken(c, 'e-stop')).toBe(true);
-    expect(nameTaken(c, 'e-stop', '1')).toBe(false);
-    expect(nameTaken(c, 'Guard door')).toBe(false);
-  });
-  it('lists planned names not yet taken', () => {
-    expect(toTake(c)).toEqual(['Guard door', 'Light curtain']);
-  });
-  it('flags a category name already used', () => {
-    const e = set([c, cat('d', 'Functional', [])]);
-    expect(categoryTaken(e, 'safety')).toBe(true);
-    expect(categoryTaken(e, 'Safety', 'c')).toBe(false);
   });
 });
 
 describe('zipEntries', () => {
-  it('puts each photo at Category/Name.jpg and nothing else', () => {
-    const e = set([cat('a', 'Safety', [['1', 'E-stop'], ['2', 'Guard door']]), cat('b', 'Functional', [['3', 'Run test 10 min']]), cat('c', 'Empty', [])]);
-    expect(zipEntries(e).map((x) => x.path)).toEqual(['Safety/E-stop.jpg', 'Safety/Guard door.jpg', 'Functional/Run test 10 min.jpg']);
+  const e = set([
+    ['Machine Verification', [item('1', 'CCTV', [], ['a']), item('2', 'Loader Robot Specification', ['EPSON'], ['b', 'c']), item('3', 'KVM 1', ['KVM'])]],
+    ['Function Verification', [item('4', 'ET_Inspection_{fixture}_ResultOK', ['Vision Master'], ['d'])]],
+  ]);
+  it('puts photos at Folder/Name.jpg, or Folder/Subfolder/Name.jpg, with _2 for extra photos', () => {
+    expect(zipEntries(e).map((z) => z.path)).toEqual([
+      'Machine Verification/CCTV.jpg',
+      'Machine Verification/EPSON/Loader Robot Specification.jpg',
+      'Machine Verification/EPSON/Loader Robot Specification_2.jpg',
+      'Function Verification/Vision Master/ET_Inspection_FT1234_ResultOK.jpg',
+    ]);
+  });
+  it('draws them as a folder tree', () => {
+    expect(treeLines(zipEntries(e).map((z) => z.path))).toEqual([
+      '├─ Machine Verification/',
+      '│  ├─ CCTV.jpg',
+      '│  └─ EPSON/',
+      '│     ├─ Loader Robot Specification.jpg',
+      '│     └─ Loader Robot Specification_2.jpg',
+      '└─ Function Verification/',
+      '   └─ Vision Master/',
+      '      └─ ET_Inspection_FT1234_ResultOK.jpg',
+    ]);
+  });
+  it('names the zip after the machine and FT number', () => {
+    expect(zipBaseName(e)).toBe('SSDLV_FT1234');
   });
 });
 
-describe('evidenceProblems', () => {
-  it('blocks export on unnamed photos and duplicates in the same folder', () => {
-    const e = set([cat('a', 'Safety', [['1', 'E-stop'], ['2', 'e-stop'], ['3', '']]), cat('b', 'Functional', [['4', 'E-stop']])]);
-    expect(evidenceProblems(e).map((p) => p.kind)).toEqual(['duplicate', 'unnamed']);
+describe('progress', () => {
+  const items = [item('1', 'A', [], ['p']), item('2', 'B'), item('3', 'C', [], [], { na: true }), item('4', 'D'), item('5', 'Extra', [], ['q'], { extra: true })];
+  it('counts list items taken, not applicable and still missing; extras only add photos', () => {
+    expect(progressOf(items)).toEqual({ total: 4, taken: 1, na: 1, missing: 2, photos: 2 });
   });
-  it('blocks two categories with the same folder name', () => {
-    const e = set([cat('a', 'Safety', [['1', 'A']]), cat('b', 'safety', [['2', 'B']])]);
-    expect(evidenceProblems(e).map((p) => p.kind)).toEqual(['category']);
+  it('finds the next missing item after the last one taken, wrapping to the top', () => {
+    expect(nextMissing(items)?.id).toBe('2');
+    expect(nextMissing(items, '2')?.id).toBe('4');
+    expect(nextMissing(items, '4')?.id).toBe('2');
   });
-  it('is happy when every photo has a unique name', () => {
-    expect(evidenceProblems(set([cat('a', 'Safety', [['1', 'A'], ['2', 'B']])]))).toEqual([]);
+  it('groups items by subfolder in list order', () => {
+    const g = groupByPath([item('1', 'CCTV'), item('2', 'X', ['EPSON']), item('3', 'Y', ['epson']), item('4', 'KVM 1', ['KVM'])]);
+    expect(g.map((x) => [x.path.join('/'), x.items.length])).toEqual([['', 1], ['EPSON', 2], ['KVM', 1]]);
   });
 });
 
-describe('zipBaseName', () => {
-  it('uses the machine name, then the code', () => {
-    expect(zipBaseName({ title: 'Conveyor A', machineCode: 'CONV-001' })).toBe('Conveyor A');
-    expect(zipBaseName({ title: '', machineCode: 'CONV-001' })).toBe('CONV-001');
+describe('name clashes', () => {
+  const e = set([['Machine Verification', [item('1', 'CCTV', [], ['a']), item('2', 'Robot', ['EPSON'])]]]);
+  it('spots a photo added on site that matches an existing name in the same place', () => {
+    expect(nameClash(e.folders[0], [], 'cctv', e.ft)).toBe(true);
+    expect(nameClash(e.folders[0], ['EPSON'], 'CCTV', e.ft)).toBe(false);
+  });
+  it('blocks export when two photos would get the same file', () => {
+    const bad = set([['F', [item('1', 'A', [], ['a', 'b']), item('2', 'A_2', [], ['c'], { extra: true })]]]);
+    expect(zipClashes(bad)).toEqual(['F/A_2.jpg']);
+    expect(zipClashes(e)).toEqual([]);
+  });
+  it('numbers extra photos of one item', () => {
+    expect([0, 1, 2].map((i) => photoFileName({ name: 'CCTV' }, i, ''))).toEqual(['CCTV.jpg', 'CCTV_2.jpg', 'CCTV_3.jpg']);
   });
 });

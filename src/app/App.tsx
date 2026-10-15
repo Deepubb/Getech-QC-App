@@ -4,20 +4,13 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastHost } from '../components/ui';
 import { UpdatePrompt } from '../components/UpdatePrompt';
 import { useApp } from '../data/store';
-import { ChecklistScreen } from '../screens/Checklist';
-import { ChecklistDetails } from '../screens/ChecklistDetails';
-import { ChecklistExport } from '../screens/ChecklistExport';
-import { ChecklistItemScreen } from '../screens/ChecklistItem';
-import { EditChecklist } from '../screens/EditChecklist';
 import { EvidenceScreen } from '../screens/Evidence';
 import { EvidenceExport } from '../screens/EvidenceExport';
+import { FolderScreen } from '../screens/Folder';
 import { InstallGate, isIos, isStandalone, Welcome } from '../screens/Gates';
 import { Home } from '../screens/Home';
-import { NewChecklist } from '../screens/NewChecklist';
 import { NewEvidence } from '../screens/NewEvidence';
 import { Settings } from '../screens/Settings';
-import { CategoryScreen } from '../screens/Category';
-import { Templates } from '../screens/Templates';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -98,17 +91,10 @@ export function App() {
       <ScrollToTop />
       <ScreenBoundary>
         <Route path="/" element={<Home />} />
-        <Route path="/checklists/new" element={<NewChecklist />} />
-        <Route path="/checklists/new/details" element={<ChecklistDetails />} />
-        <Route path="/checklists/:id" element={<ChecklistScreen />} />
-        <Route path="/checklists/:id/items/:itemId" element={<ChecklistItemScreen />} />
-        <Route path="/checklists/:id/edit" element={<EditChecklist />} />
-        <Route path="/checklists/:id/export" element={<ChecklistExport />} />
         <Route path="/evidence/new" element={<NewEvidence />} />
         <Route path="/evidence/:id" element={<EvidenceScreen />} />
-        <Route path="/evidence/:id/c/:catId" element={<CategoryScreen />} />
+        <Route path="/evidence/:id/f/:folderId" element={<FolderScreen />} />
         <Route path="/evidence/:id/export" element={<EvidenceExport />} />
-        <Route path="/templates" element={<Templates />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </ScreenBoundary>

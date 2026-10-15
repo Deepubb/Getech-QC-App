@@ -1,4 +1,4 @@
-import { Home, LayoutTemplate, Settings } from 'lucide-react';
+import { Home, Settings } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 export function TabBar() {
@@ -8,10 +8,6 @@ export function TabBar() {
         <NavLink to="/" end>
           <Home />
           Home
-        </NavLink>
-        <NavLink to="/templates">
-          <LayoutTemplate />
-          Templates
         </NavLink>
         <NavLink to="/settings">
           <Settings />

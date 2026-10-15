@@ -1,89 +1,102 @@
-import type { EvidenceCategory, EvidencePhoto, EvidenceSet } from './types';
+import type { EvidenceFolder, EvidenceItem, EvidencePhoto, EvidenceSet } from './types';
+import { fillFixture } from './masterList';
+import { safeName } from './names';
 
-export const DEFAULT_CATEGORIES = ['Safety', 'Functional', 'Mechanical', 'Electrical', 'Software & GUI', 'Customer Request'];
+export { safeName };
 
-/**
- * Makes a typed name safe as a file or folder name while changing as little as possible:
- * removes characters Windows, macOS and Android refuse (\ / : * ? " < > | and control
- * characters), collapses spaces, trims spaces and dots at the ends, drops a typed ".jpg".
- * "Belt tension (left)" stays "Belt tension (left)".
- */
-export function safeName(input: string | null | undefined): string {
-  return String(input ?? '')
-    .replace(/\.(jpe?g|png|heic)\s*$/i, '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/^[\s.]+|[\s.]+$/g, '')
-    .slice(0, 120);
+/** The item's name with {fixture} filled in: the file name without ".jpg". */
+export const itemName = (item: Pick<EvidenceItem, 'name'>, ft: string) => safeName(fillFixture(item.name, ft));
+export const itemPath = (item: Pick<EvidenceItem, 'path'>, ft: string) => item.path.map((p) => safeName(fillFixture(p, ft))).filter(Boolean);
+
+/** "CCTV.jpg", then "CCTV_2.jpg", "CCTV_3.jpg" for extra photos of the same item. */
+export function photoFileName(item: Pick<EvidenceItem, 'name'>, index: number, ft: string): string {
+  return `${itemName(item, ft)}${index ? `_${index + 1}` : ''}.jpg`;
 }
 
-const key = (s: string) => safeName(s).toLowerCase();
+/** Where an item's photos go inside the zip, e.g. "Machine Verification/EPSON". */
+export const itemFolder = (folder: Pick<EvidenceFolder, 'name'>, item: Pick<EvidenceItem, 'path'>, ft: string) =>
+  [safeName(folder.name), ...itemPath(item, ft)].join('/');
 
-/** Photo names already used in a category (case-insensitive), optionally ignoring one photo. */
-export function usedNames(cat: EvidenceCategory, exceptPhotoId?: string): Set<string> {
-  return new Set(cat.photos.filter((p) => p.id !== exceptPhotoId && safeName(p.name)).map((p) => key(p.name)));
+export const isTaken = (i: EvidenceItem) => i.photos.length > 0;
+/** Still needed: on the list, no photo yet, not marked not applicable. */
+export const isMissing = (i: EvidenceItem) => !i.extra && !i.na && !isTaken(i);
+
+export interface Progress {
+  total: number;
+  taken: number;
+  na: number;
+  missing: number;
+  photos: number;
 }
 
-export function nameTaken(cat: EvidenceCategory, name: string, exceptPhotoId?: string): boolean {
-  const k = key(name);
-  return !!k && usedNames(cat, exceptPhotoId).has(k);
+export function progressOf(items: EvidenceItem[]): Progress {
+  const listed = items.filter((i) => !i.extra);
+  return {
+    total: listed.length,
+    taken: listed.filter(isTaken).length,
+    na: listed.filter((i) => i.na && !isTaken(i)).length,
+    missing: listed.filter(isMissing).length,
+    photos: items.reduce((a, i) => a + i.photos.length, 0),
+  };
 }
 
-/** Planned names not yet taken in this category, in template order. */
-export function toTake(cat: EvidenceCategory): string[] {
-  const used = usedNames(cat);
-  return cat.planned.filter((n) => safeName(n) && !used.has(key(n)));
+export const allItems = (e: EvidenceSet) => e.folders.flatMap((f) => f.items);
+export const evidenceProgress = (e: EvidenceSet) => progressOf(allItems(e));
+export const evidencePhotoCount = (e: EvidenceSet) => allItems(e).reduce((a, i) => a + i.photos.length, 0);
+export const evidenceBytes = (e: EvidenceSet) => allItems(e).reduce((a, i) => a + i.photos.reduce((b, p) => b + p.bytes, 0), 0);
+
+/** The next item to photograph after `afterId` in list order, wrapping round to the top. */
+export function nextMissing(items: EvidenceItem[], afterId?: string): EvidenceItem | undefined {
+  const start = afterId ? items.findIndex((i) => i.id === afterId) + 1 : 0;
+  return [...items.slice(start), ...items.slice(0, start)].find(isMissing);
 }
 
-export const categoryTaken = (e: EvidenceSet, name: string, exceptId?: string) =>
-  e.categories.some((c) => c.id !== exceptId && key(c.name) === key(name));
+/** Items grouped by subfolder, in the order the subfolders first appear in the list. */
+export function groupByPath(items: EvidenceItem[]): { path: string[]; items: EvidenceItem[] }[] {
+  const groups = new Map<string, { path: string[]; items: EvidenceItem[] }>();
+  for (const i of items) {
+    const k = i.path.join('/').toLowerCase();
+    if (!groups.has(k)) groups.set(k, { path: i.path, items: [] });
+    groups.get(k)!.items.push(i);
+  }
+  return [...groups.values()];
+}
+
+/** True when another item already gives the same folder and file name. */
+export function nameClash(folder: EvidenceFolder, path: string[], name: string, ft: string, exceptId?: string): boolean {
+  const key = (p: string[], n: string) => [...p.map((x) => safeName(fillFixture(x, ft))), safeName(fillFixture(n, ft))].join('/').toLowerCase();
+  const k = key(path, name);
+  return folder.items.some((i) => i.id !== exceptId && key(i.path, i.name) === k);
+}
 
 export interface ZipEntry {
   path: string;
-  category: EvidenceCategory;
+  item: EvidenceItem;
   photo: EvidencePhoto;
 }
 
-/** Zip paths are exactly "<Category>/<Photo name>.jpg". Empty categories make no folder. */
+/** Every photo at "<Folder>/<Subfolder>/<Name>.jpg". Nothing else goes in the zip. */
 export function zipEntries(e: EvidenceSet): ZipEntry[] {
-  return e.categories.flatMap((category) =>
-    category.photos.map((photo) => ({ path: `${safeName(category.name)}/${safeName(photo.name)}.jpg`, category, photo })),
+  return e.folders.flatMap((folder) =>
+    folder.items.flatMap((item) => item.photos.map((photo, i) => ({ path: `${itemFolder(folder, item, e.ft)}/${photoFileName(item, i, e.ft)}`, item, photo }))),
   );
 }
 
-export interface EvidenceProblem {
-  kind: 'unnamed' | 'duplicate' | 'category';
-  message: string;
-  categoryId: string;
-  photoId?: string;
-}
-
-/** Anything that would make a file or folder name empty or collide. Export is blocked until fixed. */
-export function evidenceProblems(e: EvidenceSet): EvidenceProblem[] {
-  const out: EvidenceProblem[] = [];
-  const seenCats = new Map<string, string>();
-  for (const c of e.categories) {
-    const ck = key(c.name);
-    if (!c.photos.length) continue;
-    if (!ck) out.push({ kind: 'category', categoryId: c.id, message: 'A category with photos has no name.' });
-    else if (seenCats.has(ck)) out.push({ kind: 'category', categoryId: c.id, message: `Two categories are called "${safeName(c.name)}".` });
-    else seenCats.set(ck, c.id);
-    const seen = new Set<string>();
-    for (const p of c.photos) {
-      const pk = key(p.name);
-      if (!pk) out.push({ kind: 'unnamed', categoryId: c.id, photoId: p.id, message: `A photo in ${safeName(c.name) || 'a category'} has no name.` });
-      else if (seen.has(pk)) out.push({ kind: 'duplicate', categoryId: c.id, photoId: p.id, message: `"${safeName(p.name)}" is used twice in ${safeName(c.name)}.` });
-      else seen.add(pk);
-    }
+/** Two photos that would land on the same file in the zip. Export is blocked until fixed. */
+export function zipClashes(e: EvidenceSet): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const z of zipEntries(e)) {
+    const k = z.path.toLowerCase();
+    if (seen.has(k)) out.push(z.path);
+    seen.add(k);
   }
   return out;
 }
 
-export const evidencePhotoCount = (e: EvidenceSet) => e.categories.reduce((a, c) => a + c.photos.length, 0);
-export const evidenceBytes = (e: EvidenceSet) => e.categories.reduce((a, c) => a + c.photos.reduce((b, p) => b + p.bytes, 0), 0);
-
-/** Zip file name: the machine name (or code), nothing else. */
-export function zipBaseName(e: Pick<EvidenceSet, 'title' | 'machineCode'>): string {
-  return safeName(e.title) || safeName(e.machineCode) || 'Photo evidence';
+/** Zip file name: machine and FT number, e.g. "SSDLV_FT1234". */
+export function zipBaseName(e: Pick<EvidenceSet, 'machine' | 'ft'>): string {
+  return [safeName(e.machine), safeName(e.ft)].filter(Boolean).join('_') || 'Photo evidence';
 }
+
+export const setTitle = (e: Pick<EvidenceSet, 'machine' | 'ft'>) => [e.machine, e.ft].filter(Boolean).join(' · ');

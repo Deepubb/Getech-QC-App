@@ -19,7 +19,7 @@ export function InstallGate({ onContinue }: { onContinue: () => void }) {
         <img src={logo} alt="GeTech" width={528} height={146} />
       </div>
       <h1>Install the app before you start</h1>
-      <p>On iPhone, work started in Safari is kept separately from the installed app and can be cleared. Installing keeps your inspections safe and lets the app work offline.</p>
+      <p>On iPhone, work started in Safari is kept separately from the installed app and can be cleared. Installing keeps your photos safe and lets the app work offline.</p>
       <div className="panel">
         <ol className="steps">
           <li>
@@ -60,8 +60,8 @@ export function Welcome() {
       <div className="logo-plate">
         <img src={logo} alt="GeTech" width={528} height={146} />
       </div>
-      <h1>QC checklists and photo evidence, on your phone</h1>
-      <p>Run buyoff checklists, take as many photos as you need, and send the Excel report and photo zip wherever you like. It works without signal.</p>
+      <h1>QC photo evidence, on your phone</h1>
+      <p>Tap each photo name from your machine list, take the photo, and send one zip in the right folders wherever you like. It works without signal.</p>
       <div className="panel">
         <label className="field">
           <span className="label">Your name</span>

@@ -1,32 +1,3 @@
-export type ItemResult = 'pending' | 'ok' | 'nok' | 'na';
-/** N = optional, Y = always required, M = required only when the result is NOK. */
-export type RemarksRule = 'N' | 'Y' | 'M';
-
-export interface TemplateItem {
-  itemNo: string;
-  category: string;
-  procedure: string;
-  expected: string;
-  remarksRule: RemarksRule;
-  failInstruction: string;
-}
-
-export interface ChecklistItem extends TemplateItem {
-  id: string;
-  result: ItemResult;
-  remarks: string;
-  completedAt: string | null;
-}
-
-export type ChecklistStatus = 'in_progress' | 'completed';
-
-export interface MachineInfo {
-  machineName: string;
-  machineCode: string;
-  customer: string;
-  cwo: string;
-}
-
 interface SyncFields {
   id: string;
   createdAt: string;
@@ -34,59 +5,70 @@ interface SyncFields {
   deviceId: string;
 }
 
-export interface Checklist extends MachineInfo, SyncFields {
-  engineer: string;
-  status: ChecklistStatus;
-  exportedAt: string | null;
-  items: ChecklistItem[];
+/**
+ * One photo a master list asks for. A cell "EPSON > Loader Robot" gives path ["EPSON"] and
+ * name "Loader Robot"; a cell without ">" has an empty path. The name may hold {fixture}.
+ */
+export interface ListShot {
+  path: string[];
+  name: string;
 }
 
-export interface Template extends SyncFields {
-  machineCode: string;
-  machineName: string;
-  customer: string;
-  version: string;
-  items: TemplateItem[];
+/** One column of the master sheet: the column heading is the main folder in the zip. */
+export interface ListFolder {
+  name: string;
+  shots: ListShot[];
 }
 
-/** One photo. Its file name in the zip is exactly `name` + ".jpg". */
+/** A machine's master list, read from one sheet of the uploaded Excel. The sheet name is the machine name. */
+export interface MasterList extends SyncFields {
+  machine: string;
+  folders: ListFolder[];
+  /** The Excel file it came from, shown in Settings. */
+  source: string;
+}
+
 export interface EvidencePhoto {
   id: string;
-  name: string;
   takenAt: string;
   bytes: number;
 }
 
-/** A folder in the zip, e.g. "Safety". `planned` are names expected for this machine (from a photo template). */
-export interface EvidenceCategory {
+/**
+ * One photo name from the list (or added on site when `extra`). Its photos are saved as
+ * "<name>.jpg", then "<name>_2.jpg", "<name>_3.jpg".
+ */
+export interface EvidenceItem {
   id: string;
+  path: string[];
+  /** As written in the list; {fixture} is filled in from the FT number when files are named. */
   name: string;
-  planned: string[];
+  extra: boolean;
+  na: boolean;
   photos: EvidencePhoto[];
 }
 
-/** Photo evidence for one machine, grouped into categories. */
-export interface EvidenceSet extends SyncFields {
-  title: string;
-  machineCode: string;
-  cwo: string;
-  customer: string;
-  engineer: string;
-  exportedAt: string | null;
-  categories: EvidenceCategory[];
+export interface EvidenceFolder {
+  id: string;
+  name: string;
+  items: EvidenceItem[];
 }
 
-/** Categories and photo names saved per machine code, used to pre-fill the next set. */
-export interface PhotoTemplate extends SyncFields {
-  machineCode: string;
-  categories: { name: string; names: string[] }[];
+/** Photo evidence for one machine, copied from its master list when started. */
+export interface EvidenceSet extends SyncFields {
+  /** The master list (sheet) name, e.g. SSDLV. */
+  machine: string;
+  /** FT number of this machine; fills {fixture} in photo names. */
+  ft: string;
+  engineer: string;
+  exportedAt: string | null;
+  folders: EvidenceFolder[];
 }
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 export interface Settings {
   engineerName: string;
-  defaultCategories: string[];
   splitMB: number;
   theme: ThemeChoice;
   deviceId: string;

@@ -1,19 +1,17 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Checklist, EvidenceSet, PhotoTemplate, Settings, StoredPhoto, Template } from '../core/types';
+import type { EvidenceSet, MasterList, Settings, StoredPhoto } from '../core/types';
 
 interface QcDB extends DBSchema {
-  checklists: { key: string; value: Checklist };
-  templates: { key: string; value: Template };
   evidence: { key: string; value: EvidenceSet };
-  photoTemplates: { key: string; value: PhotoTemplate };
+  masterLists: { key: string; value: MasterList };
   photos: { key: string; value: StoredPhoto };
   meta: { key: string; value: unknown };
 }
 
-export type DocStore = 'checklists' | 'templates' | 'evidence' | 'photoTemplates';
+export type DocStore = 'evidence' | 'masterLists';
 
 const DB_NAME = 'getech-qc';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 let dbPromise: Promise<IDBPDatabase<QcDB>> | null = null;
 
 /** Every read and write goes through this module, so sync or encryption can be added later in one place. */
@@ -21,17 +19,18 @@ export function db(): Promise<IDBPDatabase<QcDB>> {
   dbPromise ??= openDB<QcDB>(DB_NAME, DB_VERSION, {
     upgrade(d, oldVersion) {
       if (oldVersion < 1) {
-        d.createObjectStore('checklists', { keyPath: 'id' });
-        d.createObjectStore('templates', { keyPath: 'id' });
         d.createObjectStore('evidence', { keyPath: 'id' });
         d.createObjectStore('photos');
         d.createObjectStore('meta');
       }
-      if (oldVersion < 2) {
-        // Version 1 kept flat "shot lists"; version 2 keeps photo templates grouped by category.
-        const names = d.objectStoreNames as DOMStringList;
-        if (names.contains('shotlists')) (d as unknown as IDBDatabase).deleteObjectStore('shotlists');
-        d.createObjectStore('photoTemplates', { keyPath: 'id' });
+      if (oldVersion < 3) {
+        // Version 3 is photo evidence only: checklists, their templates and the old photo
+        // templates are gone; photo names now come from uploaded master lists.
+        const raw = d as unknown as IDBDatabase;
+        for (const old of ['checklists', 'templates', 'shotlists', 'photoTemplates']) {
+          if (raw.objectStoreNames.contains(old)) raw.deleteObjectStore(old);
+        }
+        d.createObjectStore('masterLists', { keyPath: 'id' });
       }
     },
   });
@@ -40,14 +39,12 @@ export function db(): Promise<IDBPDatabase<QcDB>> {
 
 export async function loadAll() {
   const d = await db();
-  const [checklists, templates, evidence, photoTemplates, settings] = await Promise.all([
-    d.getAll('checklists'),
-    d.getAll('templates'),
+  const [evidence, masterLists, settings] = await Promise.all([
     d.getAll('evidence'),
-    d.getAll('photoTemplates'),
+    d.getAll('masterLists'),
     d.get('meta', 'settings') as Promise<Settings | undefined>,
   ]);
-  return { checklists, templates, evidence, photoTemplates, settings };
+  return { evidence, masterLists, settings };
 }
 
 export async function putDoc<S extends DocStore>(store: S, value: QcDB[S]['value']): Promise<void> {
@@ -84,9 +81,10 @@ export async function deletePhotos(ids: string[]): Promise<void> {
   await Promise.all([...ids.map((id) => tx.store.delete(id)), tx.done]);
 }
 
+/** Deletes all photo evidence and settings; machine lists are kept. */
 export async function wipeDatabase(): Promise<void> {
   const d = await db();
-  const tx = d.transaction(['checklists', 'templates', 'evidence', 'photoTemplates', 'photos', 'meta'], 'readwrite');
+  const tx = d.transaction(['evidence', 'photos', 'meta'], 'readwrite');
   await Promise.all([...tx.objectStoreNames].map((n) => tx.objectStore(n).clear()));
   await tx.done;
 }

@@ -1,21 +1,15 @@
-/** Letters, digits, hyphen and underscore only; no extension; at most 100 characters. */
-export function cleanName(input: string | null | undefined): string {
+/**
+ * Makes a name safe as a file or folder name while changing as little as possible:
+ * removes characters Windows, macOS and Android refuse (\ / : * ? " < > | and control
+ * characters), collapses spaces, trims spaces and dots at the ends, drops a typed ".jpg".
+ * "Belt tension (left)" stays "Belt tension (left)".
+ */
+export function safeName(input: string | null | undefined): string {
   return String(input ?? '')
-    .trim()
-    .replace(/\.(jpe?g|png|heic)$/i, '')
-    .replace(/[^A-Za-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 100);
-}
-
-export function pad(n: number, width = 2): string {
-  return String(n).padStart(width, '0');
-}
-
-export function ymd(d = new Date()): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-export function checklistFileName(machineCode: string, date = new Date()): string {
-  return `QC_Buyoff_${cleanName(machineCode) || 'machine'}_${ymd(date).replace(/-/g, '')}.xlsx`;
+    .replace(/\.(jpe?g|png|heic)\s*$/i, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s.]+|[\s.]+$/g, '')
+    .slice(0, 120);
 }

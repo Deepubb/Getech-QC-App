@@ -1,9 +1,11 @@
 # Getech QC Web
 
-Installable web app (PWA) for QC buyoff work on iPhone and Android. It has two separate parts:
+Installable web app (PWA) for QC buyoff photo evidence on iPhone and Android.
 
-- **QC checklists**: OK / NOK / N/A results and remarks per item, exported as an Excel report in the GeTech buyoff layout.
-- **Photo evidence**: one set per machine, grouped into categories you can edit (Safety, Functional, …). Take a photo, type its name, take the next. The zip holds one folder per category and each photo named exactly as typed (`Safety/Emergency stop button.jpg`), nothing else. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
+1. In **Settings**, upload a master Excel. Each sheet is one machine, named after the sheet.
+2. Start photo evidence for a machine and type its FT number.
+3. Tap each photo name and take the photo; the app names it. Items can be marked not applicable, get extra photos (`_2`, `_3`) or be added on site.
+4. Export one zip laid out like the sheet. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
 
 There is no login and no server. Everything is stored in the browser (IndexedDB) on the phone until it is exported.
 
@@ -42,13 +44,35 @@ The camera, install to home screen, offline mode and file sharing only work over
 ```text
 src/
 ├── app/          App shell, routes, first-run and install gates
-├── core/         Types, naming rules, checklist rules, Excel import (pure, unit-tested)
+├── core/         Types, master list reading, naming and zip paths (pure, unit-tested)
 ├── data/         IndexedDB access (db.ts) and the app store (store.ts)
 ├── camera/       Photo resize, time stamp, EXIF removal
-├── reports/      Excel report in the GeTech buyoff layout (ExcelJS, loaded on demand)
 ├── export/       Evidence zip builder, split planning, share and download
-├── components/   Shared UI (app bar, sheets, toasts, thumbnails, capture buttons)
+├── components/   Shared UI (app bar, sheets, toasts, thumbnails, camera, machine lists)
 └── screens/      One file per screen
 ```
 
-The Excel import reads the same two-sheet workbook as the native app (sheets **Checklist** and **MachineInfo**). Photo file names in that workbook, grouped by the item's category, can be saved as a photo template for that machine; they do not change the checklist.
+## Master Excel
+
+| Function Verification | Machine Verification | ESD Measurement |
+|---|---|---|
+| Arm reached limit_Loader | CCTV | ESD > Drive Drop Pad |
+| Vision Master > ET_Inspection_{fixture}_ResultOK | EPSON > Loader Robot Specification | Ground > EPSON_Loader |
+
+- The sheet name is the machine name (for example `SSDLV`).
+- Row 1 holds the main folders. Every cell below a heading is one photo for that folder.
+- `A > B` puts photo `B` in subfolder `A`. Without `>`, the cell is the photo name.
+- `{fixture}` is filled with the FT number typed when the machine is started.
+
+The zip for the table above, for FT number `FT1234`, is `SSDLV_FT1234.zip`:
+
+```text
+Function Verification/Arm reached limit_Loader.jpg
+Function Verification/Vision Master/ET_Inspection_FT1234_ResultOK.jpg
+Machine Verification/CCTV.jpg
+Machine Verification/EPSON/Loader Robot Specification.jpg
+ESD Measurement/ESD/Drive Drop Pad.jpg
+ESD Measurement/Ground/EPSON_Loader.jpg
+```
+
+Uploading the file again updates machines with the same sheet name; photo evidence already started keeps the list it started with.

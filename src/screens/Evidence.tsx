@@ -1,36 +1,35 @@
-import { ChevronRight, FolderPlus, MoreHorizontal, Package, Pencil, Save, Trash2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ChevronRight, MoreHorizontal, Package, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { ProgressBar } from '../components/ProgressBar';
 import { EvidenceChip } from '../components/StatusChip';
 import { Thumb } from '../components/Thumb';
 import { AppBar, ConfirmSheet, Field, Sheet, toast } from '../components/ui';
-import { categoryTaken, evidenceProblems, safeName, toTake } from '../core/evidence';
+import { evidenceBytes, evidencePhotoCount, evidenceProgress, progressOf, setTitle } from '../core/evidence';
 import { fmtSize, plural } from '../core/format';
-import { photoBytes, photoCount } from '../core/rules';
-import { findPhotoTemplate, planOf, useApp } from '../data/store';
+import { usesFixture } from '../core/masterList';
+import { useApp } from '../data/store';
 
 export function EvidenceScreen() {
   const { id = '' } = useParams();
   const nav = useNavigate();
-  const { evidence, photoTemplates, updateEvidence, deleteEvidence, savePhotoTemplate, addCategory } = useApp();
+  const { evidence, updateEvidence, deleteEvidence } = useApp();
   const e = evidence.find((x) => x.id === id);
   const [menu, setMenu] = useState(false);
-  const [sheet, setSheet] = useState<'details' | 'template' | 'delete' | 'category' | null>(null);
-  const [catName, setCatName] = useState('');
-  if (!e) return <Navigate to="/?m=evidence" replace />;
+  const [sheet, setSheet] = useState<'ft' | 'delete' | null>(null);
+  const [ft, setFt] = useState(e?.ft ?? '');
+  if (!e) return <Navigate to="/" replace />;
 
-  const n = photoCount(e);
-  const problems = evidenceProblems(e);
-  const existing = findPhotoTemplate(photoTemplates, e.machineCode);
-  const cleanCat = safeName(catName);
-  const catExists = !!cleanCat && categoryTaken(e, cleanCat);
+  const p = evidenceProgress(e);
+  const n = evidencePhotoCount(e);
+  const fixture = usesFixture({ folders: e.folders.map((f) => ({ name: f.name, shots: f.items })) });
 
   return (
     <div className="shell">
       <AppBar
-        title={e.title || e.machineCode || 'Photo evidence'}
-        sub={[e.machineCode, e.cwo].filter(Boolean).join(' · ') || 'Photo evidence'}
-        back="/?m=evidence"
+        title={e.machine}
+        sub={e.ft ? `FT ${e.ft}` : 'No FT number'}
+        back="/"
         actions={
           <button className="iconbtn" aria-label="More actions" onClick={() => setMenu(true)}>
             <MoreHorizontal />
@@ -39,82 +38,67 @@ export function EvidenceScreen() {
       />
       <main className="content with-bar">
         <section className="card stack">
-          <div className="between">
+          <div className="between" style={{ alignItems: 'flex-start' }}>
             <div>
-              <div className="eyebrow">Photo evidence</div>
-              <div className="tnum" style={{ font: '600 26px/1.1 var(--font-head)', marginTop: 4 }}>
-                {n}
-                <span className="muted" style={{ fontSize: 16 }}>
-                  {' '}
-                  {n === 1 ? 'photo' : 'photos'} · {plural(e.categories.length, 'category', 'categories')}
-                </span>
+              <div className="eyebrow">Photos taken</div>
+              <div className="tnum" style={{ font: '600 30px/1.1 var(--font-head)', marginTop: 4 }}>
+                {p.taken}
+                <span className="muted" style={{ fontSize: 17 }}> / {p.total}</span>
               </div>
             </div>
             <EvidenceChip e={e} />
           </div>
-          <p className="hint">Pick a category, then take photos and name each one as you go.</p>
+          <ProgressBar p={p} />
+          <div className="small muted tnum">
+            {p.missing ? `${p.missing} still to take` : 'Everything on the list is done'}
+            {p.na ? ` · ${p.na} not applicable` : ''}
+            {n !== p.taken ? ` · ${plural(n, 'photo')} in all` : ''}
+          </div>
         </section>
 
-        {e.categories.map((c) => {
-          const todo = toTake(c);
-          const unnamed = c.photos.filter((p) => !safeName(p.name)).length;
+        {e.folders.map((f) => {
+          const fp = progressOf(f.items);
+          const recent = f.items.flatMap((i) => i.photos).slice(-5).reverse();
           return (
-            <Link key={c.id} to={`/evidence/${e.id}/c/${c.id}`} className="card card-link stack">
+            <Link key={f.id} to={`/evidence/${e.id}/f/${f.id}`} className="card card-link stack">
               <div className="catcard">
                 <div style={{ minWidth: 0 }}>
-                  <h3 className="wrap-anywhere">{c.name || 'Unnamed category'}</h3>
-                  <div className="small muted">
-                    {plural(c.photos.length, 'photo')}
-                    {todo.length ? ` · ${todo.length} to take` : ''}
-                    {unnamed ? <span style={{ color: 'var(--nok)' }}> · {unnamed} unnamed</span> : null}
+                  <h3 className="wrap-anywhere">{f.name}</h3>
+                  <div className="small muted tnum">
+                    {fp.taken} of {fp.total} taken
+                    {fp.na ? ` · ${fp.na} N/A` : ''}
                   </div>
                 </div>
-                <ChevronRight className="muted" />
+                {fp.missing ? <ChevronRight className="muted" /> : <CheckCircle2 style={{ color: 'var(--ok)' }} />}
               </div>
-              {c.photos.length ? (
+              <ProgressBar p={fp} />
+              {recent.length ? (
                 <div className="strip">
-                  {c.photos.slice(-5).reverse().map((p) => (
-                    <Thumb key={p.id} id={p.id} />
+                  {recent.map((ph) => (
+                    <Thumb key={ph.id} id={ph.id} />
                   ))}
                 </div>
               ) : null}
             </Link>
           );
         })}
-
-        <button className="btn btn-block" onClick={() => setSheet('category')}>
-          <FolderPlus /> Add a category
-        </button>
       </main>
 
       <div className="actionbar">
         <div>
-          {problems.length && n ? (
-            <div className="hint bad" style={{ textAlign: 'center' }}>
-              <TriangleAlert size={14} style={{ verticalAlign: '-2px' }} /> {plural(problems.length, 'photo name')} to fix before export
-            </div>
-          ) : null}
           <button className="btn btn-primary btn-block" disabled={!n} onClick={() => nav(`/evidence/${e.id}/export`)}>
-            <Package /> Export {plural(n, 'photo')} as zip{n ? ` · ${fmtSize(photoBytes(e))}` : ''}
+            <Package /> Export {plural(n, 'photo')} as zip{n ? ` · ${fmtSize(evidenceBytes(e))}` : ''}
           </button>
         </div>
       </div>
 
-      <Sheet open={menu} onClose={() => setMenu(false)} title="Photo evidence">
+      <Sheet open={menu} onClose={() => setMenu(false)} title={setTitle(e)}>
         <div className="list">
-          <button className="li" onClick={() => (setMenu(false), setSheet('details'))}>
+          <button className="li" onClick={() => (setMenu(false), setFt(e.ft), setSheet('ft'))}>
             <Pencil className="muted" />
             <span className="t">
-              <b>Edit machine details</b>
-              <div className="s">Name, code, CWO, customer</div>
-            </span>
-            <span />
-          </button>
-          <button className="li" onClick={() => (setMenu(false), setSheet('template'))}>
-            <Save className="muted" />
-            <span className="t">
-              <b>Save as template for next time</b>
-              <div className="s">{e.machineCode ? `Categories and photo names for ${e.machineCode}` : 'Needs a machine code'}</div>
+              <b>Change FT number</b>
+              <div className="s">{fixture ? 'Also renames photos that use {fixture}' : 'Used in the zip name'}</div>
             </span>
             <span />
           </button>
@@ -129,49 +113,25 @@ export function EvidenceScreen() {
         </div>
       </Sheet>
 
-      <Sheet open={sheet === 'category'} onClose={() => setSheet(null)} title="Add a category">
+      <Sheet open={sheet === 'ft'} onClose={() => setSheet(null)} title="FT number">
         <form
           className="stack"
           onSubmit={async (ev) => {
             ev.preventDefault();
-            if (!cleanCat || catExists) return;
-            const cid = await addCategory(e.id, cleanCat);
-            setCatName('');
+            if (!ft.trim()) return;
+            await updateEvidence(e.id, (d) => void (d.ft = ft.trim()));
             setSheet(null);
-            nav(`/evidence/${e.id}/c/${cid}`);
+            toast('FT number saved.', 'good');
           }}
         >
-          <Field label="Category name" hint={catExists ? <span className="bad">There is already a category with that name.</span> : 'This is the folder name in the zip.'}>
-            <input value={catName} onChange={(ev) => setCatName(ev.target.value)} placeholder="e.g. Pneumatic" autoFocus />
+          <Field label="FT number" hint={fixture ? 'Fills {fixture} in the photo names.' : 'Used in the zip name.'}>
+            <input className="mono" value={ft} onChange={(ev) => setFt(ev.target.value)} autoFocus />
           </Field>
-          <button className="btn btn-primary btn-block" type="submit" disabled={!cleanCat || catExists}>
-            Add and open
+          <button className="btn btn-primary btn-block" type="submit" disabled={!ft.trim()}>
+            Save
           </button>
         </form>
       </Sheet>
-
-      <DetailsSheet
-        open={sheet === 'details'}
-        initial={e}
-        onClose={() => setSheet(null)}
-        onSave={(v) => updateEvidence(e.id, (d) => Object.assign(d, v)).then(() => toast('Details saved.', 'good'))}
-      />
-      <ConfirmSheet
-        open={sheet === 'template'}
-        title={existing ? 'Replace the saved template?' : 'Save as template?'}
-        body={
-          e.machineCode
-            ? `The ${plural(e.categories.length, 'category', 'categories')} and their photo names become the template for ${e.machineCode}. Next time you start photo evidence for this machine, they are ready to take.`
-            : 'Add a machine code in Edit machine details first. Templates are saved per machine code.'
-        }
-        confirmLabel={existing ? 'Replace' : 'Save'}
-        onClose={() => setSheet(null)}
-        onConfirm={async () => {
-          if (!e.machineCode) return;
-          const r = await savePhotoTemplate(e.machineCode, planOf(e));
-          toast(r === 'created' ? 'Template saved.' : 'Template replaced.', 'good');
-        }}
-      />
       <ConfirmSheet
         open={sheet === 'delete'}
         title="Delete this photo evidence?"
@@ -182,51 +142,9 @@ export function EvidenceScreen() {
         onConfirm={async () => {
           await deleteEvidence(e.id);
           toast('Photo evidence deleted.');
-          nav('/?m=evidence', { replace: true });
+          nav('/', { replace: true });
         }}
       />
     </div>
-  );
-}
-
-function DetailsSheet({
-  open,
-  initial,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  initial: { title: string; machineCode: string; cwo: string; customer: string };
-  onClose: () => void;
-  onSave: (v: { title: string; machineCode: string; cwo: string; customer: string }) => void;
-}) {
-  const [v, setV] = useState(initial);
-  return (
-    <Sheet open={open} onClose={onClose} title="Machine details">
-      <Field label="Machine name" hint="Also the name of the zip file.">
-        <input value={v.title} onChange={(ev) => setV({ ...v, title: ev.target.value })} />
-      </Field>
-      <Field label="Machine code">
-        <input className="mono" value={v.machineCode} onChange={(ev) => setV({ ...v, machineCode: ev.target.value })} />
-      </Field>
-      <div className="btn-row">
-        <Field label="CWO">
-          <input className="mono" value={v.cwo} onChange={(ev) => setV({ ...v, cwo: ev.target.value })} />
-        </Field>
-        <Field label="Customer">
-          <input value={v.customer} onChange={(ev) => setV({ ...v, customer: ev.target.value })} />
-        </Field>
-      </div>
-      <button
-        className="btn btn-primary btn-block"
-        disabled={!v.title.trim()}
-        onClick={() => {
-          onSave({ title: v.title.trim(), machineCode: v.machineCode.trim(), cwo: v.cwo.trim(), customer: v.customer.trim() });
-          onClose();
-        }}
-      >
-        Save details
-      </button>
-    </Sheet>
   );
 }

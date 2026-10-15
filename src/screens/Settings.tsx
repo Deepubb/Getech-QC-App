@@ -1,28 +1,19 @@
-import { Copy, HardDrive, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Copy, HardDrive, ShieldCheck, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { MachineLists } from '../components/MachineLists';
 import { TabBar } from '../components/TabBar';
 import { AppBar, ConfirmSheet, Field, toast } from '../components/ui';
-import { safeName } from '../core/evidence';
 import { fmtSize } from '../core/format';
 import type { ThemeChoice } from '../core/types';
 import { clearProblems, readProblems } from '../data/problemLog';
 import { useApp } from '../data/store';
 
 export function Settings() {
-  const { settings, saveSettings, wipeAll, checklists, evidence } = useApp();
+  const { settings, saveSettings, wipeAll, evidence } = useApp();
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [wipe, setWipe] = useState(false);
-  const [newCat, setNewCat] = useState('');
   const [problems, setProblems] = useState(readProblems);
-  const cats = settings.defaultCategories;
-  const addCat = () => {
-    const n = safeName(newCat);
-    if (!n) return;
-    if (cats.some((c) => c.toLowerCase() === n.toLowerCase())) return toast(`${n} is already in the list.`, 'bad');
-    void saveSettings({ defaultCategories: [...cats, n] });
-    setNewCat('');
-  };
 
   async function refresh() {
     try {
@@ -35,7 +26,7 @@ export function Settings() {
   }
   useEffect(() => {
     void refresh();
-  }, [checklists.length, evidence.length]);
+  }, [evidence.length]);
 
   const pct = estimate && estimate.quota ? Math.min(100, (estimate.usage / estimate.quota) * 100) : 0;
 
@@ -43,8 +34,10 @@ export function Settings() {
     <div className="shell">
       <AppBar title="Settings" back={false} />
       <main className="content">
+        <MachineLists />
+
         <section className="card stack">
-          <Field label="Your name" hint="Shown on new checklists and photo evidence.">
+          <Field label="Your name" hint="Saved with new photo evidence.">
             <input defaultValue={settings.engineerName} onBlur={(e) => e.target.value.trim() && void saveSettings({ engineerName: e.target.value.trim() })} />
           </Field>
           <Field label="Split photo zips larger than" hint="90 MB keeps each part under WhatsApp's document limit of about 100 MB.">
@@ -63,33 +56,6 @@ export function Settings() {
               <option value="dark">Dark</option>
             </select>
           </Field>
-        </section>
-
-        <section className="card stack">
-          <b>Default photo categories</b>
-          <p className="hint">New photo evidence starts with these folders, unless the machine has its own template.</p>
-          <div className="cats">
-            {cats.map((c) => (
-              <span key={c} className="cat-chip">
-                {c}
-                <button aria-label={`Remove ${c}`} onClick={() => void saveSettings({ defaultCategories: cats.filter((x) => x !== c) })}>
-                  <X />
-                </button>
-              </span>
-            ))}
-          </div>
-          <form
-            className="row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              addCat();
-            }}
-          >
-            <input className="input grow" value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Add a category" aria-label="New default category" />
-            <button className="btn" type="submit" disabled={!safeName(newCat)}>
-              <Plus /> Add
-            </button>
-          </form>
         </section>
 
         <section className="card stack">
@@ -189,7 +155,7 @@ export function Settings() {
       <ConfirmSheet
         open={wipe}
         title="Delete all data?"
-        body="Every checklist, photo, template and shot list on this phone is deleted. Export anything you need first. This cannot be undone."
+        body="All photo evidence on this phone is deleted. Your machine lists stay. Export anything you need first. This cannot be undone."
         confirmLabel="Delete everything"
         danger
         onClose={() => setWipe(false)}
