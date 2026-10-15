@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the Worker's name in Cloudflare.
+  "name": "getech-qc-app",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Any app address (e.g. /evidence/...) opens the app, so reloading a screen works.
+    "not_found_handling": "single-page-application",
+    // The team list must reach the script, never the app's index page.
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [
+    {
+      // The team master list. Cloudflare creates this storage on the first deploy.
+      "binding": "MASTER"
+    }
+  ]
+}

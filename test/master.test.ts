@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { onRequestGet, onRequestPost, validLists, type Env } from '../functions/api/master';
+import { onRequestGet, onRequestPost, validLists, type Env } from '../worker/master';
 
 const kv = () => {
   const m = new Map<string, string>();

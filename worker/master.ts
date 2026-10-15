@@ -1,10 +1,10 @@
 /**
- * Cloudflare Pages Function at /api/master: the team's master list of photo names.
+ * /api/master: the team's master list of photo names.
  *
  * GET  returns the latest published list (404 until someone publishes).
  * POST publishes a new list. It needs the team passcode in the X-Publish-Passcode header.
  *
- * Set up once in the Pages project: a KV namespace bound as MASTER, and a secret PUBLISH_PASSCODE.
+ * Needs a KV namespace bound as MASTER (see wrangler.jsonc) and a secret PUBLISH_PASSCODE.
  * The Excel is read on the publisher's PC; only machine, folder and photo names are sent here.
  */
 
@@ -18,7 +18,7 @@ export interface Env {
   PUBLISH_PASSCODE?: string;
 }
 
-interface Context {
+export interface Context {
   request: Request;
   env: Env;
 }

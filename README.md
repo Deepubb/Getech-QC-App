@@ -21,27 +21,25 @@ npm run preview    # serve the production build on http://localhost:4173
 
 The camera, install to home screen, offline mode and file sharing only work over HTTPS (or on `localhost`).
 
-## Deploy to Cloudflare Pages
+## Deploy to Cloudflare (Workers)
 
-1. This repository is ready to connect as is.
-2. In Cloudflare, go to **Workers & Pages → Create → Pages → Connect to Git** and pick the repository.
-3. Build settings:
-   - Framework preset: **Vite** (or None)
+The app is a Cloudflare Worker: `worker/index.ts` serves the built app from `dist/` and the team master list at `/api/master`. `wrangler.jsonc` holds the settings.
+
+1. In Cloudflare, go to **Workers & Pages → Create → Import a repository** and pick this repository.
+2. Build settings:
    - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Environment variable: `NODE_VERSION` = `20` or later
-4. Deploy. Cloudflare gives you an address like `https://<project>.pages.dev`. Every push to the main branch publishes a new version; other branches get preview addresses.
+   - Deploy command: `npx wrangler deploy`
+3. The Worker name in Cloudflare must match `name` in `wrangler.jsonc` (`getech-qc-app`).
+4. Every push to the main branch deploys a new version.
 
 ### Team master list (one-time)
 
-Publishing the master Excel uses a Pages Function (`functions/api/master.ts`) and Cloudflare KV storage:
-
-1. **Storage & databases → KV → Create** a namespace, for example `getech-qc-master`.
-2. In the Pages project: **Settings → Bindings → Add → KV namespace**. Variable name `MASTER`, namespace `getech-qc-master`.
-3. **Settings → Variables and Secrets → Add**: type **Secret**, name `PUBLISH_PASSCODE`, value the team passcode (long, at least 10 characters).
-4. **Deployments → latest → Retry deployment**, so the binding and secret take effect.
+- The KV storage bound as `MASTER` is created by Cloudflare on the first deploy.
+- Add the passcode: Worker → **Settings → Variables and Secrets → Add**, type **Secret**, name `PUBLISH_PASSCODE`, value the team passcode (long, at least 10 characters). It takes effect straight away.
 
 Anyone can read the list; only someone with the passcode can publish. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
+
+To try it locally: `npm run build`, put `PUBLISH_PASSCODE=...` in `.dev.vars`, then `npx wrangler dev`.
 
 `public/_headers` stops the service worker from being cached, so phones pick up new versions. Phones show an **Update** prompt when a new version is ready.
 
@@ -61,8 +59,9 @@ src/
 ├── export/       Evidence zip builder, split planning, share and download
 ├── components/   Shared UI (app bar, sheets, toasts, thumbnails, camera, machine lists)
 └── screens/      One file per screen
-functions/
-└── api/master.ts Team master list on Cloudflare (Pages Function + KV)
+worker/
+├── index.ts      Cloudflare Worker: serves the app and /api/master
+└── master.ts     Team master list (KV storage, passcode check)
 ```
 
 ## Master Excel
