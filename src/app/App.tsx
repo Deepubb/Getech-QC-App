@@ -15,7 +15,7 @@ import { Home } from '../screens/Home';
 import { NewChecklist } from '../screens/NewChecklist';
 import { NewEvidence } from '../screens/NewEvidence';
 import { Settings } from '../screens/Settings';
-import { ShotScreen } from '../screens/Shot';
+import { CategoryScreen } from '../screens/Category';
 import { Templates } from '../screens/Templates';
 
 function ScrollToTop() {
@@ -85,7 +85,7 @@ export function App() {
         <Route path="/checklists/:id/export" element={<ChecklistExport />} />
         <Route path="/evidence/new" element={<NewEvidence />} />
         <Route path="/evidence/:id" element={<EvidenceScreen />} />
-        <Route path="/evidence/:id/shots/:shotId" element={<ShotScreen />} />
+        <Route path="/evidence/:id/c/:catId" element={<CategoryScreen />} />
         <Route path="/evidence/:id/export" element={<EvidenceExport />} />
         <Route path="/templates" element={<Templates />} />
         <Route path="/settings" element={<Settings />} />

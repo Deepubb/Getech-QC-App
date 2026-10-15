@@ -3,7 +3,7 @@
 Installable web app (PWA) for QC buyoff work on iPhone and Android. It has two separate parts:
 
 - **QC checklists**: OK / NOK / N/A results and remarks per item, exported as an Excel report in the GeTech buyoff layout.
-- **Photo evidence**: take as many photos as you need, name them, and export them as a zip (split automatically above a size limit, 90 MB by default, so each part fits WhatsApp).
+- **Photo evidence**: one set per machine, grouped into categories you can edit (Safety, Functional, …). Take a photo, type its name, take the next. The zip holds one folder per category and each photo named exactly as typed (`Safety/Emergency stop button.jpg`), nothing else. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
 
 There is no login and no server. Everything is stored in the browser (IndexedDB) on the phone until it is exported.
 
@@ -51,4 +51,4 @@ src/
 └── screens/      One file per screen
 ```
 
-The Excel import reads the same two-sheet workbook as the native app (sheets **Checklist** and **MachineInfo**). Photo file names in that workbook can be saved as a shot list for photo evidence; they do not change the checklist.
+The Excel import reads the same two-sheet workbook as the native app (sheets **Checklist** and **MachineInfo**). Photo file names in that workbook, grouped by the item's category, can be saved as a photo template for that machine; they do not change the checklist.

@@ -49,18 +49,23 @@ export interface Template extends SyncFields {
   items: TemplateItem[];
 }
 
-export interface PhotoRef {
+/** One photo. Its file name in the zip is exactly `name` + ".jpg". */
+export interface EvidencePhoto {
   id: string;
+  name: string;
   takenAt: string;
   bytes: number;
 }
 
-export interface Shot {
+/** A folder in the zip, e.g. "Safety". `planned` are names expected for this machine (from a photo template). */
+export interface EvidenceCategory {
   id: string;
   name: string;
-  photos: PhotoRef[];
+  planned: string[];
+  photos: EvidencePhoto[];
 }
 
+/** Photo evidence for one machine, grouped into categories. */
 export interface EvidenceSet extends SyncFields {
   title: string;
   machineCode: string;
@@ -68,19 +73,20 @@ export interface EvidenceSet extends SyncFields {
   customer: string;
   engineer: string;
   exportedAt: string | null;
-  shots: Shot[];
+  categories: EvidenceCategory[];
 }
 
-/** Photo names saved per machine code, used to pre-fill new evidence sets. */
-export interface ShotList extends SyncFields {
+/** Categories and photo names saved per machine code, used to pre-fill the next set. */
+export interface PhotoTemplate extends SyncFields {
   machineCode: string;
-  names: string[];
+  categories: { name: string; names: string[] }[];
 }
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 export interface Settings {
   engineerName: string;
+  defaultCategories: string[];
   splitMB: number;
   theme: ThemeChoice;
   deviceId: string;

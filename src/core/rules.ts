@@ -1,3 +1,4 @@
+import { evidenceBytes, evidencePhotoCount } from './evidence';
 import type { Checklist, ChecklistItem, EvidenceSet } from './types';
 
 export function remarksOk(it: Pick<ChecklistItem, 'remarksRule' | 'remarks' | 'result'>): boolean {
@@ -25,8 +26,8 @@ export function checklistLabel(c: Checklist): 'exported' | 'completed' | 'in_pro
   return c.status;
 }
 
-export const photoCount = (e: EvidenceSet) => e.shots.reduce((a, s) => a + s.photos.length, 0);
-export const photoBytes = (e: EvidenceSet) => e.shots.reduce((a, s) => a + s.photos.reduce((b, p) => b + p.bytes, 0), 0);
+export const photoCount = evidencePhotoCount;
+export const photoBytes = evidenceBytes;
 
 export function evidenceLabel(e: EvidenceSet): 'empty' | 'exported' | 'not_exported' {
   if (!photoCount(e)) return 'empty';

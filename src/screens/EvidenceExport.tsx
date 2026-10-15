@@ -1,11 +1,11 @@
-import { Download, FileArchive, Loader2, Share2 } from 'lucide-react';
+import { Download, FileArchive, Folder, Loader2, Share2, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { EvidenceChip } from '../components/StatusChip';
 import { AppBar, toast } from '../components/ui';
+import { evidenceProblems, safeName, zipBaseName } from '../core/evidence';
 import { fmtDateTime, fmtSize, plural } from '../core/format';
 import { nowISO } from '../core/ids';
-import { evidenceFiles, evidenceZipPrefix } from '../core/names';
 import { photoCount } from '../core/rules';
 import { getPhoto } from '../data/db';
 import { useApp } from '../data/store';
@@ -20,11 +20,13 @@ export function EvidenceExport() {
   const [progress, setProgress] = useState('Preparing…');
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const problems = e ? evidenceProblems(e) : [];
+  const blocked = problems.length > 0;
 
   // Build the zip as soon as the screen opens, so Share can run straight from the tap.
   const version = e?.updatedAt;
   useEffect(() => {
-    if (!e || !photoCount(e)) return;
+    if (!e || !photoCount(e) || blocked) return;
     let alive = true;
     setPack(null);
     setError(null);
@@ -36,17 +38,16 @@ export function EvidenceExport() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, version, settings.splitMB]);
+  }, [id, version, settings.splitMB, blocked]);
 
   if (!e) return <Navigate to="/?m=evidence" replace />;
-  const files = evidenceFiles(e);
-  const shown = files.slice(0, 10);
+  const folders = e.categories.filter((c) => c.photos.length);
   const zipFiles = pack ? pack.parts.map((p) => toFile(p.blob, p.name, 'application/zip')) : [];
   const shareable = zipFiles.length > 0 && canShareFiles(zipFiles);
   const markExported = () => updateEvidence(e.id, (d) => void (d.exportedAt = nowISO()), { touch: false });
 
   async function onShare() {
-    const r = await shareFiles(zipFiles, `${e!.title || e!.machineCode} photo evidence`);
+    const r = await shareFiles(zipFiles, `${e!.title || e!.machineCode} photos`);
     if (r === 'shared') {
       await markExported();
       toast('Shared. Marked as exported.', 'good');
@@ -71,73 +72,98 @@ export function EvidenceExport() {
         <section className="card stack">
           <div className="between">
             <b>
-              {plural(files.length, 'photo')} · {plural(e.shots.filter((s) => s.photos.length).length, 'shot')}
+              {plural(photoCount(e), 'photo')} in {plural(folders.length, 'folder')}
             </b>
             <EvidenceChip e={e} />
           </div>
-          <div className="eyebrow">Inside the zip</div>
+          <div className="eyebrow">Inside {zipBaseName(e)}.zip</div>
           <div className="tree">
-            {[
-              `${evidenceZipPrefix(e)}.zip`,
-              ...shown.map((f) => `├─ ${f.filename}`),
-              ...(files.length > shown.length ? [`├─ … ${files.length - shown.length} more`] : []),
-              '└─ manifest.json',
-            ].join('\n')}
+            {folders
+              .flatMap((c, ci) => {
+                const lastFolder = ci === folders.length - 1;
+                const shown = c.photos.slice(0, 6);
+                return [
+                  `${lastFolder ? '└─' : '├─'} ${safeName(c.name)}/`,
+                  ...shown.map((p, pi) => `${lastFolder ? '   ' : '│  '}${pi === shown.length - 1 && c.photos.length <= 6 ? '└─' : '├─'} ${safeName(p.name) || '(needs a name)'}.jpg`),
+                  ...(c.photos.length > 6 ? [`${lastFolder ? '   ' : '│  '}└─ … ${c.photos.length - 6} more`] : []),
+                ];
+              })
+              .join('\n') || 'No photos yet.'}
           </div>
-          <p className="hint">Photos keep the names you typed. Unnamed photos get an automatic name. Empty shots are left out.</p>
+          <p className="hint">One folder per category, each photo named exactly as you typed it. Nothing else is added.</p>
         </section>
 
-        <section className="card stack">
-          {error ? (
-            <div className="banner bad">Could not build the zip: {error}</div>
-          ) : !pack ? (
-            <div className="row muted">
-              <Loader2 className="spin" /> {progress}
+        {blocked ? (
+          <section className="stack">
+            <div className="banner bad">
+              <TriangleAlert />
+              <span>
+                <b>Fix {plural(problems.length, 'name')} first.</b> Every photo needs a name, and names must be unique within a category.
+              </span>
             </div>
-          ) : (
-            <>
-              <div className="between">
+            <div className="list">
+              {problems.map((p, i) => {
+                const cat = e.categories.find((c) => c.id === p.categoryId);
+                return (
+                  <Link key={i} className="li" to={`/evidence/${e.id}/c/${p.categoryId}`}>
+                    <Folder className="muted" />
+                    <span className="t">
+                      {p.message}
+                      <div className="s">Open {cat?.name || 'the category'} to fix it</div>
+                    </span>
+                    <span />
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          <section className="card stack">
+            {error ? (
+              <div className="banner bad">Could not build the zip: {error}</div>
+            ) : !pack ? (
+              <div className="row muted">
+                <Loader2 className="spin" /> {progress}
+              </div>
+            ) : (
+              <>
                 <b>
                   {pack.parts.length > 1 ? `${pack.parts.length} zip parts` : 'Zip ready'} · {fmtSize(pack.totalBytes)}
                 </b>
-              </div>
-              {pack.parts.length > 1 ? (
-                <p className="hint">
-                  Split into parts under {settings.splitMB} MB so each fits WhatsApp. Send every part; part 1 holds the manifest.
-                </p>
-              ) : null}
-              <div className="filelist">
-                {pack.parts.map((p, i) => (
-                  <div key={p.name}>
-                    <span className="row grow" style={{ alignItems: 'flex-start' }}>
-                      <FileArchive size={18} className="muted" style={{ flex: 'none', marginTop: 2 }} />
-                      <span className="mono wrap-anywhere">{p.name}</span>
-                    </span>
-                    <span className="row" style={{ flex: 'none' }}>
-                      <span className="muted tnum">{fmtSize(p.size)}</span>
-                      {pack.parts.length > 1 ? (
-                        <button className="btn btn-sm" onClick={() => void onDownload(i)} aria-label={`Download ${p.name}`}>
-                          <Download />
-                        </button>
-                      ) : null}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {shareable ? (
-                <button className="btn btn-primary btn-block" onClick={onShare}>
-                  <Share2 /> Share to WhatsApp, Drive, Files…
-                </button>
-              ) : null}
-              {pack.parts.length === 1 ? (
-                <button className={`btn btn-block ${shareable ? '' : 'btn-primary'}`} onClick={() => void onDownload(0)}>
-                  <Download /> Download zip
-                </button>
-              ) : null}
-              {e.exportedAt ? <div className="tiny muted">Last exported {fmtDateTime(e.exportedAt)}</div> : null}
-            </>
-          )}
-        </section>
+                {pack.parts.length > 1 ? <p className="hint">Split into parts under {settings.splitMB} MB so each fits WhatsApp. Send every part; each keeps the same folders.</p> : null}
+                <div className="filelist">
+                  {pack.parts.map((p, i) => (
+                    <div key={p.name}>
+                      <span className="row grow" style={{ alignItems: 'flex-start' }}>
+                        <FileArchive size={18} className="muted" style={{ flex: 'none', marginTop: 2 }} />
+                        <span className="mono wrap-anywhere">{p.name}</span>
+                      </span>
+                      <span className="row" style={{ flex: 'none' }}>
+                        <span className="muted tnum">{fmtSize(p.size)}</span>
+                        {pack.parts.length > 1 ? (
+                          <button className="btn btn-sm" onClick={() => void onDownload(i)} aria-label={`Download ${p.name}`}>
+                            <Download />
+                          </button>
+                        ) : null}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {shareable ? (
+                  <button className="btn btn-primary btn-block" onClick={onShare}>
+                    <Share2 /> Share to WhatsApp, Drive, Files…
+                  </button>
+                ) : null}
+                {pack.parts.length === 1 ? (
+                  <button className={`btn btn-block ${shareable ? '' : 'btn-primary'}`} onClick={() => void onDownload(0)}>
+                    <Download /> Download zip
+                  </button>
+                ) : null}
+                {e.exportedAt ? <div className="tiny muted">Last exported {fmtDateTime(e.exportedAt)}</div> : null}
+              </>
+            )}
+          </section>
+        )}
       </main>
     </div>
   );

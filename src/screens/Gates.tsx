@@ -15,7 +15,9 @@ export function isStandalone(): boolean {
 export function InstallGate({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="gate">
-      <img className="logo" src={logo} alt="GeTech" />
+      <div className="logo-plate">
+        <img src={logo} alt="GeTech" width={528} height={146} />
+      </div>
       <h1>Install the app before you start</h1>
       <p>On iPhone, work started in Safari is kept separately from the installed app and can be cleared. Installing keeps your inspections safe and lets the app work offline.</p>
       <div className="panel">
@@ -55,7 +57,9 @@ export function Welcome() {
         if (name.trim()) void saveSettings({ engineerName: name.trim() });
       }}
     >
-      <img className="logo" src={logo} alt="GeTech" />
+      <div className="logo-plate">
+        <img src={logo} alt="GeTech" width={528} height={146} />
+      </div>
       <h1>QC checklists and photo evidence, on your phone</h1>
       <p>Run buyoff checklists, take as many photos as you need, and send the Excel report and photo zip wherever you like. It works without signal.</p>
       <div className="panel">

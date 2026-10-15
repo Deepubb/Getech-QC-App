@@ -1,7 +1,8 @@
-import { HardDrive, ShieldCheck, Trash2 } from 'lucide-react';
+import { HardDrive, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { TabBar } from '../components/TabBar';
 import { AppBar, ConfirmSheet, Field, toast } from '../components/ui';
+import { safeName } from '../core/evidence';
 import { fmtSize } from '../core/format';
 import type { ThemeChoice } from '../core/types';
 import { useApp } from '../data/store';
@@ -11,6 +12,15 @@ export function Settings() {
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [wipe, setWipe] = useState(false);
+  const [newCat, setNewCat] = useState('');
+  const cats = settings.defaultCategories;
+  const addCat = () => {
+    const n = safeName(newCat);
+    if (!n) return;
+    if (cats.some((c) => c.toLowerCase() === n.toLowerCase())) return toast(`${n} is already in the list.`, 'bad');
+    void saveSettings({ defaultCategories: [...cats, n] });
+    setNewCat('');
+  };
 
   async function refresh() {
     try {
@@ -51,6 +61,33 @@ export function Settings() {
               <option value="dark">Dark</option>
             </select>
           </Field>
+        </section>
+
+        <section className="card stack">
+          <b>Default photo categories</b>
+          <p className="hint">New photo evidence starts with these folders, unless the machine has its own template.</p>
+          <div className="cats">
+            {cats.map((c) => (
+              <span key={c} className="cat-chip">
+                {c}
+                <button aria-label={`Remove ${c}`} onClick={() => void saveSettings({ defaultCategories: cats.filter((x) => x !== c) })}>
+                  <X />
+                </button>
+              </span>
+            ))}
+          </div>
+          <form
+            className="row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              addCat();
+            }}
+          >
+            <input className="input grow" value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Add a category" aria-label="New default category" />
+            <button className="btn" type="submit" disabled={!safeName(newCat)}>
+              <Plus /> Add
+            </button>
+          </form>
         </section>
 
         <section className="card stack">

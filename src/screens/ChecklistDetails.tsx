@@ -3,11 +3,11 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AppBar, Field, toast } from '../components/ui';
 import { plural } from '../core/format';
-import { findShotList, useApp } from '../data/store';
+import { findPhotoTemplate, useApp } from '../data/store';
 
 export function ChecklistDetails() {
   const nav = useNavigate();
-  const { draft, settings, shotlists, createChecklist, saveShotList } = useApp();
+  const { draft, settings, photoTemplates, createChecklist, savePhotoTemplate } = useApp();
   const [form, setForm] = useState(() => ({ ...(draft?.machine ?? { machineName: '', machineCode: '', customer: '', cwo: '' }), engineer: settings.engineerName }));
   const [keepNames, setKeepNames] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -16,7 +16,8 @@ export function ChecklistDetails() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
   const blocking = draft.errors.filter((e) => !e.startsWith('Machine'));
   const missing = !form.machineName.trim() || !form.machineCode.trim();
-  const existingList = findShotList(shotlists, form.machineCode);
+  const existingList = findPhotoTemplate(photoTemplates, form.machineCode);
+  const plannedCount = draft ? draft.photoPlan.reduce((a, c) => a + c.names.length, 0) : 0;
 
   async function start() {
     if (missing) return toast('Machine name and machine code are required.', 'bad');
@@ -28,7 +29,7 @@ export function ChecklistDetails() {
         draft!.items,
         engineer.trim() || settings.engineerName,
       );
-      if (keepNames && draft!.photoNames.length) await saveShotList(machine.machineCode, draft!.photoNames);
+      if (keepNames && plannedCount) await savePhotoTemplate(machine.machineCode, draft!.photoPlan);
       toast(draft!.items.length ? 'Checklist started.' : 'Checklist started. Add items in the editor.', 'good');
       nav(`/checklists/${id}`, { replace: true });
     } finally {
@@ -76,12 +77,12 @@ export function ChecklistDetails() {
           </Field>
         </div>
 
-        {draft.photoNames.length > 0 ? (
+        {plannedCount > 0 ? (
           <label className="card flat check">
             <input type="checkbox" checked={keepNames} onChange={(e) => setKeepNames(e.target.checked)} />
             <span className="small">
-              This Excel file lists {plural(draft.photoNames.length, 'photo name')}. Save them as the shot list for this machine, so photo evidence can start with them.
-              {existingList ? ' This replaces the saved list for this machine code.' : ''} The checklist itself does not use them.
+              This Excel file lists {plural(plannedCount, 'photo name')} in {plural(draft.photoPlan.length, 'category', 'categories')}. Save them as the photo template for this machine, so photo evidence can start with them.
+              {existingList ? ' This replaces the saved template for this machine code.' : ''} The checklist itself does not use them.
             </span>
           </label>
         ) : null}

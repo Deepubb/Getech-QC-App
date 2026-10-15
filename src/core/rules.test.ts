@@ -41,10 +41,10 @@ describe('labels', () => {
     expect(checklistLabel(c({ status: 'completed', exportedAt: '2026-10-14T09:00:00Z' }))).toBe('completed');
   });
   it('labels evidence sets', () => {
-    const e = (patch: Partial<EvidenceSet>) => ({ shots: [], exportedAt: null, updatedAt: '2026-10-14T10:00:00Z', ...patch }) as EvidenceSet;
+    const e = (patch: Partial<EvidenceSet>) => ({ categories: [], exportedAt: null, updatedAt: '2026-10-14T10:00:00Z', ...patch }) as EvidenceSet;
     expect(evidenceLabel(e({}))).toBe('empty');
-    const shots = [{ id: 's', name: '', photos: [{ id: 'p', takenAt: '', bytes: 1 }] }];
-    expect(evidenceLabel(e({ shots }))).toBe('not_exported');
-    expect(evidenceLabel(e({ shots, exportedAt: '2026-10-14T10:00:00Z' }))).toBe('exported');
+    const categories = [{ id: 'c', name: 'Safety', planned: [], photos: [{ id: 'p', name: 'A', takenAt: '', bytes: 1 }] }];
+    expect(evidenceLabel(e({ categories }))).toBe('not_exported');
+    expect(evidenceLabel(e({ categories, exportedAt: '2026-10-14T10:00:00Z' }))).toBe('exported');
   });
 });

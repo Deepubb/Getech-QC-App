@@ -23,7 +23,7 @@ export function NewChecklist() {
         fileName: file.name,
         machine: { machineName: parsed.machine.machineName, machineCode: parsed.machine.machineCode, customer: parsed.machine.customer, cwo: parsed.machine.cwo },
         items: parsed.items,
-        photoNames: parsed.photoNames,
+        photoPlan: parsed.photoPlan,
         errors: parsed.errors,
         warnings: parsed.warnings,
         categoryCount: parsed.categoryCount,
@@ -53,7 +53,7 @@ export function NewChecklist() {
                     key={t.id}
                     className="li"
                     onClick={() => {
-                      setDraft({ source: 'template', machine: { machineName: t.machineName, machineCode: t.machineCode, customer: t.customer, cwo: '' }, items: t.items, photoNames: [], errors: [], warnings: [], categoryCount: new Set(t.items.map((i) => i.category)).size });
+                      setDraft({ source: 'template', machine: { machineName: t.machineName, machineCode: t.machineCode, customer: t.customer, cwo: '' }, items: t.items, photoPlan: [], errors: [], warnings: [], categoryCount: new Set(t.items.map((i) => i.category)).size });
                       nav('/checklists/new/details');
                     }}
                   >
@@ -87,7 +87,7 @@ export function NewChecklist() {
           <button
             className="li"
             onClick={() => {
-              setDraft({ source: 'blank', machine: { machineName: '', machineCode: '', customer: '', cwo: '' }, items: [], photoNames: [], errors: [], warnings: [], categoryCount: 0 });
+              setDraft({ source: 'blank', machine: { machineName: '', machineCode: '', customer: '', cwo: '' }, items: [], photoPlan: [], errors: [], warnings: [], categoryCount: 0 });
               nav('/checklists/new/details');
             }}
           >

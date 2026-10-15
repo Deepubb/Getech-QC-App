@@ -9,7 +9,7 @@ export function UpdatePrompt() {
   } = useRegisterSW();
   if (!needRefresh) return null;
   return (
-    <div className="toast-wrap" style={{ bottom: 'calc(84px + var(--safe-bottom))', pointerEvents: 'auto' }}>
+    <div className="toast-wrap" style={{ top: 'auto', bottom: 'calc(84px + var(--safe-bottom))', pointerEvents: 'auto' }}>
       <div className="toast" role="status">
         <RefreshCw />
         <span>A new version is ready.</span>

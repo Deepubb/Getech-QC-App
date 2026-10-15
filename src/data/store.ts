@@ -1,15 +1,16 @@
 import { create } from 'zustand';
 import { processImage } from '../camera/processImage';
+import { DEFAULT_CATEGORIES, safeName } from '../core/evidence';
 import { uid, nowISO } from '../core/ids';
-import { cleanName } from '../core/names';
 import type {
   Checklist,
   ChecklistItem,
+  EvidenceCategory,
+  EvidencePhoto,
   EvidenceSet,
   MachineInfo,
-  PhotoRef,
+  PhotoTemplate,
   Settings,
-  ShotList,
   Template,
   TemplateItem,
 } from '../core/types';
@@ -19,12 +20,14 @@ export interface ChecklistDraft {
   source: 'template' | 'excel' | 'blank';
   machine: MachineInfo;
   items: TemplateItem[];
-  photoNames: string[];
+  photoPlan: { name: string; names: string[] }[];
   fileName?: string;
   errors: string[];
   warnings: string[];
   categoryCount: number;
 }
+
+export type CategoryPlan = { name: string; names: string[] }[];
 
 interface AppState {
   ready: boolean;
@@ -33,7 +36,7 @@ interface AppState {
   checklists: Checklist[];
   templates: Template[];
   evidence: EvidenceSet[];
-  shotlists: ShotList[];
+  photoTemplates: PhotoTemplate[];
   draft: ChecklistDraft | null;
 
   init(): Promise<void>;
@@ -46,18 +49,26 @@ interface AppState {
   saveTemplateFrom(checklistId: string, version?: string): Promise<'created' | 'replaced'>;
   deleteTemplate(id: string): Promise<void>;
 
-  createEvidence(info: Pick<EvidenceSet, 'title' | 'machineCode' | 'cwo' | 'customer'>, names: string[]): Promise<string>;
+  createEvidence(info: Pick<EvidenceSet, 'title' | 'machineCode' | 'cwo' | 'customer'>, plan: CategoryPlan): Promise<string>;
   updateEvidence(id: string, change: (e: EvidenceSet) => void, opts?: { touch?: boolean }): Promise<void>;
   deleteEvidence(id: string): Promise<void>;
-  addPhotos(evidenceId: string, shotId: string | null, files: File[]): Promise<{ added: number; failed: number }>;
-  deletePhoto(evidenceId: string, shotId: string, photoId: string): Promise<void>;
-  deleteShot(evidenceId: string, shotId: string): Promise<void>;
-  saveShotList(machineCode: string, names: string[]): Promise<'created' | 'replaced'>;
-  deleteShotList(id: string): Promise<void>;
+  addCategory(evidenceId: string, name: string): Promise<string>;
+  deleteCategory(evidenceId: string, categoryId: string): Promise<void>;
+  /** Stores the photo straight away so it can never be lost, then returns its id for naming. */
+  addPhoto(evidenceId: string, categoryId: string, file: File, name?: string): Promise<string>;
+  deletePhoto(evidenceId: string, categoryId: string, photoId: string): Promise<void>;
+  savePhotoTemplate(machineCode: string, plan: CategoryPlan): Promise<'created' | 'replaced'>;
+  deletePhotoTemplate(id: string): Promise<void>;
   wipeAll(): Promise<void>;
 }
 
-const defaultSettings = (): Settings => ({ engineerName: '', splitMB: 90, theme: 'system', deviceId: uid() });
+const defaultSettings = (): Settings => ({
+  engineerName: '',
+  defaultCategories: DEFAULT_CATEGORIES.slice(0, 4),
+  splitMB: 90,
+  theme: 'system',
+  deviceId: uid(),
+});
 
 function stamp<T extends { createdAt: string; updatedAt: string; deviceId: string; id: string }>(
   deviceId: string,
@@ -77,6 +88,17 @@ const toTemplateItem = (i: ChecklistItem): TemplateItem => ({
   failInstruction: i.failInstruction,
 });
 const sameCode = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const mkCategory = (name: string, planned: string[] = []): EvidenceCategory => ({ id: uid(), name: safeName(name), planned, photos: [] });
+
+/** Version 1 stored evidence as a flat list of "shots"; fold those into one category. */
+function migrateEvidence(e: EvidenceSet & { shots?: { name: string; photos: { id: string; takenAt: string; bytes: number }[] }[] }): EvidenceSet | null {
+  if (e.categories) return null;
+  const photos: EvidencePhoto[] = [];
+  for (const s of e.shots ?? []) s.photos.forEach((p, i) => photos.push({ ...p, name: s.name ? (i ? `${s.name} ${i + 1}` : s.name) : '' }));
+  const { shots: _drop, ...rest } = e;
+  void _drop;
+  return { ...rest, categories: [{ ...mkCategory('General'), photos }] };
+}
 
 export const useApp = create<AppState>((set, get) => ({
   ready: false,
@@ -85,15 +107,22 @@ export const useApp = create<AppState>((set, get) => ({
   checklists: [],
   templates: [],
   evidence: [],
-  shotlists: [],
+  photoTemplates: [],
   draft: null,
 
   async init() {
     try {
       const data = await loadAll();
       const settings = { ...defaultSettings(), ...(data.settings ?? {}) };
-      if (!data.settings) await saveSettingsDoc(settings);
-      set({ ...data, settings, ready: true });
+      if (!data.settings || !data.settings.defaultCategories) await saveSettingsDoc(settings);
+      const evidence = await Promise.all(
+        data.evidence.map(async (e) => {
+          const migrated = migrateEvidence(e);
+          if (migrated) await putDoc('evidence', migrated);
+          return migrated ?? e;
+        }),
+      );
+      set({ ...data, evidence, settings, ready: true });
       // Ask once for persistent storage so the browser does not evict inspections.
       if (!(await getMeta<boolean>('persistAsked')) && navigator.storage?.persist) {
         await setMeta('persistAsked', true);
@@ -115,13 +144,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async createChecklist(machine, items, engineer) {
-    const c = stamp<Checklist>(get().settings.deviceId, {
-      ...machine,
-      engineer,
-      status: 'in_progress',
-      exportedAt: null,
-      items: items.map(toItem),
-    });
+    const c = stamp<Checklist>(get().settings.deviceId, { ...machine, engineer, status: 'in_progress', exportedAt: null, items: items.map(toItem) });
     set({ checklists: [...get().checklists, c] });
     await putDoc('checklists', c);
     return c.id;
@@ -160,12 +183,12 @@ export const useApp = create<AppState>((set, get) => ({
     await deleteDoc('templates', id);
   },
 
-  async createEvidence(info, names) {
+  async createEvidence(info, plan) {
     const e = stamp<EvidenceSet>(get().settings.deviceId, {
       ...info,
       engineer: get().settings.engineerName,
       exportedAt: null,
-      shots: names.map((name) => ({ id: uid(), name, photos: [] })),
+      categories: plan.filter((p) => safeName(p.name)).map((p) => mkCategory(p.name, p.names.map(safeName).filter(Boolean))),
     });
     set({ evidence: [...get().evidence, e] });
     await putDoc('evidence', e);
@@ -186,71 +209,69 @@ export const useApp = create<AppState>((set, get) => ({
     const e = get().evidence.find((x) => x.id === id);
     set({ evidence: get().evidence.filter((x) => x.id !== id) });
     await deleteDoc('evidence', id);
-    if (e) await deletePhotos(e.shots.flatMap((s) => s.photos.map((p) => p.id)));
+    if (e) await deletePhotos(e.categories.flatMap((c) => c.photos.map((p) => p.id)));
   },
 
-  async addPhotos(evidenceId, shotId, files) {
-    let added = 0;
-    let failed = 0;
-    for (const file of files) {
-      try {
-        const stored = await processImage(file);
-        const ref: PhotoRef = { id: uid(), takenAt: nowISO(), bytes: stored.full.size };
-        await putPhoto(ref.id, stored);
-        await get().updateEvidence(evidenceId, (e) => {
-          const shot = shotId ? e.shots.find((s) => s.id === shotId) : null;
-          if (shot) shot.photos.push(ref);
-          else e.shots.push({ id: uid(), name: '', photos: [ref] });
-        });
-        added++;
-      } catch {
-        failed++;
-      }
-    }
-    return { added, failed };
+  async addCategory(evidenceId, name) {
+    const c = mkCategory(name);
+    await get().updateEvidence(evidenceId, (e) => void e.categories.push(c));
+    return c.id;
   },
 
-  async deletePhoto(evidenceId, shotId, photoId) {
+  async deleteCategory(evidenceId, categoryId) {
+    const cat = get().evidence.find((x) => x.id === evidenceId)?.categories.find((c) => c.id === categoryId);
+    await get().updateEvidence(evidenceId, (e) => void (e.categories = e.categories.filter((c) => c.id !== categoryId)));
+    if (cat) await deletePhotos(cat.photos.map((p) => p.id));
+  },
+
+  async addPhoto(evidenceId, categoryId, file, name = '') {
+    const stored = await processImage(file);
+    const photo: EvidencePhoto = { id: uid(), name: safeName(name), takenAt: nowISO(), bytes: stored.full.size };
+    await putPhoto(photo.id, stored);
     await get().updateEvidence(evidenceId, (e) => {
-      const shot = e.shots.find((s) => s.id === shotId);
-      if (shot) shot.photos = shot.photos.filter((p) => p.id !== photoId);
+      const cat = e.categories.find((c) => c.id === categoryId);
+      if (cat) cat.photos.push(photo);
+    });
+    return photo.id;
+  },
+
+  async deletePhoto(evidenceId, categoryId, photoId) {
+    await get().updateEvidence(evidenceId, (e) => {
+      const cat = e.categories.find((c) => c.id === categoryId);
+      if (cat) cat.photos = cat.photos.filter((p) => p.id !== photoId);
     });
     await deletePhotos([photoId]);
   },
 
-  async deleteShot(evidenceId, shotId) {
-    const e = get().evidence.find((x) => x.id === evidenceId);
-    const shot = e?.shots.find((s) => s.id === shotId);
-    await get().updateEvidence(evidenceId, (ev) => {
-      ev.shots = ev.shots.filter((s) => s.id !== shotId);
-    });
-    if (shot) await deletePhotos(shot.photos.map((p) => p.id));
-  },
-
-  async saveShotList(machineCode, names) {
-    const clean = [...new Set(names.map(cleanName).filter(Boolean))];
-    const existing = get().shotlists.find((l) => sameCode(l.machineCode, machineCode));
-    const l: ShotList = existing
-      ? { ...existing, names: clean, updatedAt: nowISO() }
-      : stamp<ShotList>(get().settings.deviceId, { machineCode: machineCode.trim(), names: clean });
-    set({ shotlists: existing ? get().shotlists.map((x) => (x.id === l.id ? l : x)) : [...get().shotlists, l] });
-    await putDoc('shotlists', l);
+  async savePhotoTemplate(machineCode, plan) {
+    const categories = plan
+      .map((c) => ({ name: safeName(c.name), names: [...new Set(c.names.map(safeName).filter(Boolean))] }))
+      .filter((c) => c.name);
+    const existing = get().photoTemplates.find((l) => sameCode(l.machineCode, machineCode));
+    const t: PhotoTemplate = existing
+      ? { ...existing, categories, updatedAt: nowISO() }
+      : stamp<PhotoTemplate>(get().settings.deviceId, { machineCode: machineCode.trim(), categories });
+    set({ photoTemplates: existing ? get().photoTemplates.map((x) => (x.id === t.id ? t : x)) : [...get().photoTemplates, t] });
+    await putDoc('photoTemplates', t);
     return existing ? 'replaced' : 'created';
   },
 
-  async deleteShotList(id) {
-    set({ shotlists: get().shotlists.filter((l) => l.id !== id) });
-    await deleteDoc('shotlists', id);
+  async deletePhotoTemplate(id) {
+    set({ photoTemplates: get().photoTemplates.filter((l) => l.id !== id) });
+    await deleteDoc('photoTemplates', id);
   },
 
   async wipeAll() {
-    const keep = { engineerName: get().settings.engineerName };
+    const keep = { engineerName: get().settings.engineerName, defaultCategories: get().settings.defaultCategories };
     await wipeDatabase();
     const settings = { ...defaultSettings(), ...keep };
     await saveSettingsDoc(settings);
-    set({ checklists: [], templates: [], evidence: [], shotlists: [], draft: null, settings });
+    set({ checklists: [], templates: [], evidence: [], photoTemplates: [], draft: null, settings });
   },
 }));
 
-export const findShotList = (lists: ShotList[], code: string) => lists.find((l) => code.trim() && sameCode(l.machineCode, code));
+export const findPhotoTemplate = (list: PhotoTemplate[], code: string) => list.find((l) => code.trim() && sameCode(l.machineCode, code));
 export const findTemplate = (templates: Template[], code: string) => templates.find((t) => code.trim() && sameCode(t.machineCode, code));
+/** The plan a set would be saved as: its categories and the photo names in each. */
+export const planOf = (e: EvidenceSet): CategoryPlan =>
+  e.categories.map((c) => ({ name: c.name, names: [...new Set([...c.photos.map((p) => p.name), ...c.planned].map(safeName).filter(Boolean))] }));

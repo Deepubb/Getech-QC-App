@@ -8,7 +8,7 @@ import { useApp } from '../data/store';
 
 export function Templates() {
   const nav = useNavigate();
-  const { templates, shotlists, setDraft, deleteTemplate, deleteShotList } = useApp();
+  const { templates, photoTemplates, setDraft, deleteTemplate, deletePhotoTemplate } = useApp();
   const [removing, setRemoving] = useState<{ kind: 'template' | 'list'; id: string; label: string } | null>(null);
 
   return (
@@ -44,7 +44,7 @@ export function Templates() {
                   <button
                     className="btn btn-primary"
                     onClick={() => {
-                      setDraft({ source: 'template', machine: { machineName: t.machineName, machineCode: t.machineCode, customer: t.customer, cwo: '' }, items: t.items, photoNames: [], errors: [], warnings: [], categoryCount: new Set(t.items.map((i) => i.category)).size });
+                      setDraft({ source: 'template', machine: { machineName: t.machineName, machineCode: t.machineCode, customer: t.customer, cwo: '' }, items: t.items, photoPlan: [], errors: [], warnings: [], categoryCount: new Set(t.items.map((i) => i.category)).size });
                       nav('/checklists/new/details');
                     }}
                   >
@@ -59,42 +59,52 @@ export function Templates() {
         )}
 
         <div className="section-title">
-          <h2>Photo shot lists</h2>
+          <h2>Photo evidence templates</h2>
         </div>
-        {shotlists.length === 0 ? (
+        {photoTemplates.length === 0 ? (
           <div className="card flat">
-            <Empty icon={<Camera />} title="No shot lists">
-              <p>In photo evidence, name your shots and choose Save names for next time.</p>
+            <Empty icon={<Camera />} title="No photo templates">
+              <p>In photo evidence for a machine, open the menu and choose Save as template for next time.</p>
             </Empty>
           </div>
         ) : (
-          [...shotlists]
+          [...photoTemplates]
             .sort((a, b) => a.machineCode.localeCompare(b.machineCode))
-            .map((l) => (
-              <div key={l.id} className="card stack">
-                <div className="between">
-                  <h3 className="mono" style={{ fontSize: 17 }}>
-                    {l.machineCode}
-                  </h3>
-                  <span className="chip">{plural(l.names.length, 'name')}</span>
+            .map((l) => {
+              const total = l.categories.reduce((a, c) => a + c.names.length, 0);
+              return (
+                <div key={l.id} className="card stack">
+                  <div className="between">
+                    <h3 className="mono" style={{ fontSize: 17 }}>
+                      {l.machineCode}
+                    </h3>
+                    <span className="chip">{plural(total, 'photo name')}</span>
+                  </div>
+                  <div className="stack" style={{ gap: 4 }}>
+                    {l.categories.map((c) => (
+                      <div key={c.name} className="small wrap-anywhere">
+                        <b>{c.name}</b>
+                        <span className="muted">{c.names.length ? ` · ${c.names.join(', ')}` : ' · no names yet'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="btn-row" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <button className="btn btn-primary" onClick={() => nav(`/evidence/new?template=${l.id}`)}>
+                      <Camera /> Start photo evidence
+                    </button>
+                    <button className="btn btn-danger" aria-label={`Delete photo template ${l.machineCode}`} onClick={() => setRemoving({ kind: 'list', id: l.id, label: l.machineCode })}>
+                      <Trash2 />
+                    </button>
+                  </div>
                 </div>
-                <div className="mono tiny muted wrap-anywhere">{l.names.join(' · ')}</div>
-                <div className="btn-row" style={{ gridTemplateColumns: '1fr auto' }}>
-                  <button className="btn btn-primary" onClick={() => nav(`/evidence/new?list=${l.id}`)}>
-                    <Camera /> Start photo evidence
-                  </button>
-                  <button className="btn btn-danger" aria-label={`Delete shot list ${l.machineCode}`} onClick={() => setRemoving({ kind: 'list', id: l.id, label: l.machineCode })}>
-                    <Trash2 />
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
         )}
       </main>
       <TabBar />
       <ConfirmSheet
         open={!!removing}
-        title={removing?.kind === 'template' ? `Delete template ${removing?.label}?` : `Delete shot list ${removing?.label}?`}
+        title={removing?.kind === 'template' ? `Delete checklist template ${removing?.label}?` : `Delete photo template ${removing?.label}?`}
         body="Work you already started is not affected."
         confirmLabel="Delete"
         danger
@@ -102,7 +112,7 @@ export function Templates() {
         onConfirm={async () => {
           if (!removing) return;
           if (removing.kind === 'template') await deleteTemplate(removing.id);
-          else await deleteShotList(removing.id);
+          else await deletePhotoTemplate(removing.id);
           toast('Deleted.');
         }}
       />

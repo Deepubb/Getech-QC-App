@@ -1,28 +1,29 @@
-import { ChevronRight, Images, MoreHorizontal, Package, Pencil, Save, Trash2 } from 'lucide-react';
+import { ChevronRight, FolderPlus, MoreHorizontal, Package, Pencil, Save, Trash2, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { CaptureButtons } from '../components/Capture';
 import { EvidenceChip } from '../components/StatusChip';
 import { Thumb } from '../components/Thumb';
-import { AppBar, ConfirmSheet, Empty, Field, Sheet, toast } from '../components/ui';
+import { AppBar, ConfirmSheet, Field, Sheet, toast } from '../components/ui';
+import { categoryTaken, evidenceProblems, safeName, toTake } from '../core/evidence';
 import { fmtSize, plural } from '../core/format';
-import { autoShotName, cleanName, duplicateNames } from '../core/names';
 import { photoBytes, photoCount } from '../core/rules';
-import { findShotList, useApp } from '../data/store';
+import { findPhotoTemplate, planOf, useApp } from '../data/store';
 
 export function EvidenceScreen() {
   const { id = '' } = useParams();
   const nav = useNavigate();
-  const { evidence, shotlists, updateEvidence, deleteEvidence, saveShotList } = useApp();
+  const { evidence, photoTemplates, updateEvidence, deleteEvidence, savePhotoTemplate, addCategory } = useApp();
   const e = evidence.find((x) => x.id === id);
   const [menu, setMenu] = useState(false);
-  const [sheet, setSheet] = useState<'details' | 'names' | 'delete' | null>(null);
+  const [sheet, setSheet] = useState<'details' | 'template' | 'delete' | 'category' | null>(null);
+  const [catName, setCatName] = useState('');
   if (!e) return <Navigate to="/?m=evidence" replace />;
 
   const n = photoCount(e);
-  const dups = duplicateNames(e.shots);
-  const named = [...new Set(e.shots.map((s) => cleanName(s.name)).filter(Boolean))];
-  const existingList = findShotList(shotlists, e.machineCode);
+  const problems = evidenceProblems(e);
+  const existing = findPhotoTemplate(photoTemplates, e.machineCode);
+  const cleanCat = safeName(catName);
+  const catExists = !!cleanCat && categoryTaken(e, cleanCat);
 
   return (
     <div className="shell">
@@ -43,51 +44,56 @@ export function EvidenceScreen() {
               <div className="eyebrow">Photo evidence</div>
               <div className="tnum" style={{ font: '600 26px/1.1 var(--font-head)', marginTop: 4 }}>
                 {n}
-                <span className="muted" style={{ fontSize: 16 }}> {n === 1 ? 'photo' : 'photos'} · {plural(e.shots.length, 'shot')}</span>
+                <span className="muted" style={{ fontSize: 16 }}>
+                  {' '}
+                  {n === 1 ? 'photo' : 'photos'} · {plural(e.categories.length, 'category', 'categories')}
+                </span>
               </div>
             </div>
             <EvidenceChip e={e} />
           </div>
-          <CaptureButtons evidenceId={e.id} shotId={null} />
-          <p className="hint">Each new photo becomes its own shot. Open a shot to name it or add more photos to it. There is no limit.</p>
+          <p className="hint">Pick a category, then take photos and name each one as you go.</p>
         </section>
 
-        {e.shots.length === 0 ? (
-          <Empty icon={<Images />} title="No photos yet">
-            <p>Tap Take photo to start. You can name each shot afterwards.</p>
-          </Empty>
-        ) : (
-          <div className="list">
-            {e.shots.map((s, i) => {
-              const nm = cleanName(s.name);
-              const dup = nm && dups.has(nm.toLowerCase());
-              return (
-                <Link key={s.id} to={`/evidence/${e.id}/shots/${s.id}`} className="li" style={{ gridTemplateColumns: '54px 1fr auto' }}>
-                  {s.photos[0] ? (
-                    <Thumb id={s.photos[0].id} />
-                  ) : (
-                    <span className="thumb slot">
-                      <Images />
-                    </span>
-                  )}
-                  <span className="t">
-                    <span className={`mono wrap-anywhere ${nm ? '' : 'muted'}`} style={{ fontSize: 14 }}>
-                      {nm ? `${nm}.jpg` : `${autoShotName(e, i)}.jpg`}
-                    </span>
-                    <div className="s" style={dup ? { color: 'var(--nok)' } : undefined}>
-                      {dup ? 'Same name as another shot' : nm ? plural(s.photos.length, 'photo') : `Automatic name · ${plural(s.photos.length, 'photo')}`}
-                    </div>
-                  </span>
-                  {s.photos.length ? <ChevronRight className="muted" /> : <span className="pill pending">Empty</span>}
-                </Link>
-              );
-            })}
-          </div>
-        )}
+        {e.categories.map((c) => {
+          const todo = toTake(c);
+          const unnamed = c.photos.filter((p) => !safeName(p.name)).length;
+          return (
+            <Link key={c.id} to={`/evidence/${e.id}/c/${c.id}`} className="card card-link stack">
+              <div className="catcard">
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="wrap-anywhere">{c.name || 'Unnamed category'}</h3>
+                  <div className="small muted">
+                    {plural(c.photos.length, 'photo')}
+                    {todo.length ? ` · ${todo.length} to take` : ''}
+                    {unnamed ? <span style={{ color: 'var(--nok)' }}> · {unnamed} unnamed</span> : null}
+                  </div>
+                </div>
+                <ChevronRight className="muted" />
+              </div>
+              {c.photos.length ? (
+                <div className="strip">
+                  {c.photos.slice(-5).reverse().map((p) => (
+                    <Thumb key={p.id} id={p.id} />
+                  ))}
+                </div>
+              ) : null}
+            </Link>
+          );
+        })}
+
+        <button className="btn btn-block" onClick={() => setSheet('category')}>
+          <FolderPlus /> Add a category
+        </button>
       </main>
 
       <div className="actionbar">
         <div>
+          {problems.length && n ? (
+            <div className="hint bad" style={{ textAlign: 'center' }}>
+              <TriangleAlert size={14} style={{ verticalAlign: '-2px' }} /> {plural(problems.length, 'photo name')} to fix before export
+            </div>
+          ) : null}
           <button className="btn btn-primary btn-block" disabled={!n} onClick={() => nav(`/evidence/${e.id}/export`)}>
             <Package /> Export {plural(n, 'photo')} as zip{n ? ` · ${fmtSize(photoBytes(e))}` : ''}
           </button>
@@ -99,28 +105,49 @@ export function EvidenceScreen() {
           <button className="li" onClick={() => (setMenu(false), setSheet('details'))}>
             <Pencil className="muted" />
             <span className="t">
-              <b>Edit details</b>
-              <div className="s">Title, machine code, CWO, customer</div>
+              <b>Edit machine details</b>
+              <div className="s">Name, code, CWO, customer</div>
             </span>
             <span />
           </button>
-          <button className="li" onClick={() => (setMenu(false), setSheet('names'))}>
+          <button className="li" onClick={() => (setMenu(false), setSheet('template'))}>
             <Save className="muted" />
             <span className="t">
-              <b>Save names for next time</b>
-              <div className="s">{e.machineCode ? `${plural(named.length, 'name')} as the shot list for ${e.machineCode}` : 'Needs a machine code'}</div>
+              <b>Save as template for next time</b>
+              <div className="s">{e.machineCode ? `Categories and photo names for ${e.machineCode}` : 'Needs a machine code'}</div>
             </span>
             <span />
           </button>
           <button className="li" onClick={() => (setMenu(false), setSheet('delete'))}>
             <Trash2 style={{ color: 'var(--nok)' }} />
             <span className="t">
-              <b style={{ color: 'var(--nok)' }}>Delete photo evidence</b>
-              <div className="s">Removes every photo in this set from the phone</div>
+              <b style={{ color: 'var(--nok)' }}>Delete this photo evidence</b>
+              <div className="s">Removes every photo of this machine from the phone</div>
             </span>
             <span />
           </button>
         </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'category'} onClose={() => setSheet(null)} title="Add a category">
+        <form
+          className="stack"
+          onSubmit={async (ev) => {
+            ev.preventDefault();
+            if (!cleanCat || catExists) return;
+            const cid = await addCategory(e.id, cleanCat);
+            setCatName('');
+            setSheet(null);
+            nav(`/evidence/${e.id}/c/${cid}`);
+          }}
+        >
+          <Field label="Category name" hint={catExists ? <span className="bad">There is already a category with that name.</span> : 'This is the folder name in the zip.'}>
+            <input value={catName} onChange={(ev) => setCatName(ev.target.value)} placeholder="e.g. Pneumatic" autoFocus />
+          </Field>
+          <button className="btn btn-primary btn-block" type="submit" disabled={!cleanCat || catExists}>
+            Add and open
+          </button>
+        </form>
       </Sheet>
 
       <DetailsSheet
@@ -130,21 +157,19 @@ export function EvidenceScreen() {
         onSave={(v) => updateEvidence(e.id, (d) => Object.assign(d, v)).then(() => toast('Details saved.', 'good'))}
       />
       <ConfirmSheet
-        open={sheet === 'names'}
-        title={existingList ? 'Replace saved names?' : 'Save names for next time?'}
+        open={sheet === 'template'}
+        title={existing ? 'Replace the saved template?' : 'Save as template?'}
         body={
-          !e.machineCode
-            ? 'Add a machine code in Edit details first. Names are saved per machine code.'
-            : !named.length
-              ? 'Name at least one shot first.'
-              : `${plural(named.length, 'name')} become the shot list for ${e.machineCode}. New photo evidence for this machine can start with them.`
+          e.machineCode
+            ? `The ${plural(e.categories.length, 'category', 'categories')} and their photo names become the template for ${e.machineCode}. Next time you start photo evidence for this machine, they are ready to take.`
+            : 'Add a machine code in Edit machine details first. Templates are saved per machine code.'
         }
-        confirmLabel={existingList ? 'Replace' : 'Save'}
+        confirmLabel={existing ? 'Replace' : 'Save'}
         onClose={() => setSheet(null)}
         onConfirm={async () => {
-          if (!e.machineCode || !named.length) return;
-          const r = await saveShotList(e.machineCode, named);
-          toast(r === 'created' ? 'Shot list saved.' : 'Shot list replaced.', 'good');
+          if (!e.machineCode) return;
+          const r = await savePhotoTemplate(e.machineCode, planOf(e));
+          toast(r === 'created' ? 'Template saved.' : 'Template replaced.', 'good');
         }}
       />
       <ConfirmSheet
@@ -177,8 +202,8 @@ function DetailsSheet({
 }) {
   const [v, setV] = useState(initial);
   return (
-    <Sheet open={open} onClose={onClose} title="Edit details">
-      <Field label="Title">
+    <Sheet open={open} onClose={onClose} title="Machine details">
+      <Field label="Machine name" hint="Also the name of the zip file.">
         <input value={v.title} onChange={(ev) => setV({ ...v, title: ev.target.value })} />
       </Field>
       <Field label="Machine code">
@@ -194,6 +219,7 @@ function DetailsSheet({
       </div>
       <button
         className="btn btn-primary btn-block"
+        disabled={!v.title.trim()}
         onClick={() => {
           onSave({ title: v.title.trim(), machineCode: v.machineCode.trim(), cwo: v.cwo.trim(), customer: v.customer.trim() });
           onClose();

@@ -25,7 +25,10 @@ describe('parseChecklistWorkbook', () => {
     expect(r.machine).toMatchObject({ machineName: 'Conveyor A', machineCode: 'CONV-001', customer: 'Acme', cwo: 'WO-1' });
     expect(r.items).toHaveLength(2);
     expect(r.items[1]).toMatchObject({ itemNo: '02', category: 'Mechanical', procedure: 'Inspect belt tension', expected: 'tight', remarksRule: 'M', failInstruction: 'Adjust if loose' });
-    expect(r.photoNames).toEqual(['voltage', 'belt']);
+    expect(r.photoPlan).toEqual([
+      { name: 'Electrical', names: ['voltage'] },
+      { name: 'Mechanical', names: ['belt'] },
+    ]);
     expect(r.errors).toEqual([]);
     expect(r.categoryCount).toBe(2);
   });
@@ -56,6 +59,9 @@ describe('parseChecklistWorkbook', () => {
     const r = parseChecklistWorkbook(buildChecklistTemplateWorkbook());
     expect(r.errors).toEqual([]);
     expect(r.items).toHaveLength(3);
-    expect(r.photoNames).toEqual(['belt-tension', 'motor-voltage']);
+    expect(r.photoPlan).toEqual([
+      { name: 'Mechanical', names: ['belt-tension'] },
+      { name: 'Electrical', names: ['motor-voltage'] },
+    ]);
   });
 });

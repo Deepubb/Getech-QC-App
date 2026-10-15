@@ -105,11 +105,11 @@ export function Home() {
           )
         ) : sortedE.length === 0 ? (
           <Empty icon={<Camera />} title="No photo evidence yet">
-            <p>Start a set, take as many photos as you need, name them, and export them as a zip.</p>
+            <p>Start one per machine, take photos into categories like Safety or Functional, name each one, and export them as a zip.</p>
           </Empty>
         ) : (
           sortedE.map((e) => {
-            const recent = e.shots.flatMap((s) => s.photos).slice(-4).reverse();
+            const recent = e.categories.flatMap((c) => c.photos).slice(-4).reverse();
             return (
               <Link key={e.id} to={`/evidence/${e.id}`} className="card card-link stack">
                 <div className="between" style={{ alignItems: 'flex-start' }}>
@@ -128,7 +128,7 @@ export function Home() {
                 ) : null}
                 <div className="between small muted tnum">
                   <span>
-                    {plural(photoCount(e), 'photo')} · {plural(e.shots.length, 'shot')}
+                    {plural(photoCount(e), 'photo')} · {plural(e.categories.filter((c) => c.photos.length).length, 'category', 'categories')}
                   </span>
                   <span>{photoCount(e) ? fmtSize(photoBytes(e)) : `Updated ${timeAgo(e.updatedAt)}`}</span>
                 </div>
@@ -140,7 +140,7 @@ export function Home() {
 
       <button className="fab" onClick={() => nav(mode === 'checklists' ? '/checklists/new' : '/evidence/new')}>
         <Plus />
-        {mode === 'checklists' ? 'New checklist' : 'New evidence'}
+        {mode === 'checklists' ? 'New checklist' : 'New photo evidence'}
       </button>
       <TabBar />
     </div>

@@ -1,17 +1,19 @@
 import * as XLSX from 'xlsx';
-import { cleanName, pad } from './names';
+import { safeName } from './evidence';
+import { pad } from './names';
 import type { MachineInfo, RemarksRule, TemplateItem } from './types';
 
 /**
  * Reads the same two-sheet workbook the native app imports:
  * a Checklist sheet (Item No, Category, Test Procedure, Expected Value, Photo Required,
  * Photo Filename, Remarks Required, Fail Instruction) and a MachineInfo sheet (label | value rows).
- * Photo columns no longer affect the checklist; photo filenames are offered as a shot list.
+ * Photo columns no longer affect the checklist; photo filenames are offered as a photo template.
  */
 export interface ParsedChecklist {
   machine: MachineInfo & { version: string };
   items: TemplateItem[];
-  photoNames: string[];
+  /** Photo file names from the sheet, grouped by the item's category; offered as a photo template. */
+  photoPlan: { name: string; names: string[] }[];
   errors: string[];
   warnings: string[];
   categoryCount: number;
@@ -66,7 +68,15 @@ export function parseChecklistWorkbook(data: ArrayBuffer | Uint8Array): ParsedCh
       failInstruction: r.fail_instruction ?? '',
     };
   });
-  const photoNames = [...new Set(valid.map((r) => cleanName(r.photo_filename)).filter(Boolean))];
+  const photoPlan: { name: string; names: string[] }[] = [];
+  for (const r of valid) {
+    const n = safeName(r.photo_filename);
+    if (!n) continue;
+    const cat = safeName(r.category) || 'General';
+    let group = photoPlan.find((g) => g.name.toLowerCase() === cat.toLowerCase());
+    if (!group) photoPlan.push((group = { name: cat, names: [] }));
+    if (!group.names.some((x) => x.toLowerCase() === n.toLowerCase())) group.names.push(n);
+  }
 
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -75,7 +85,7 @@ export function parseChecklistWorkbook(data: ArrayBuffer | Uint8Array): ParsedCh
   if (items.length === 0) errors.push('No checklist items were found.');
   if (!machine.cwo) warnings.push('CWO number is missing. You can type it before you start.');
 
-  return { machine, items, photoNames, errors, warnings, categoryCount: new Set(items.map((i) => i.category)).size };
+  return { machine, items, photoPlan, errors, warnings, categoryCount: new Set(items.map((i) => i.category)).size };
 }
 
 const SAMPLE_HEADER = ['Item No', 'Category', 'Test Procedure', 'Expected Value', 'Photo Required', 'Photo Filename', 'Remarks Required', 'Fail Instruction'];
