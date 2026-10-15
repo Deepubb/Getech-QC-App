@@ -11,7 +11,9 @@ export function NewChecklist() {
   const { templates, setDraft } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   // A draft is only kept while its details screen is open; starting over clears it.
-  useEffect(() => setDraft(null), [setDraft]);
+  useEffect(() => {
+    setDraft(null);
+  }, [setDraft]);
 
   async function onExcel(file: File) {
     try {

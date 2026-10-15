@@ -22,7 +22,11 @@ import { Templates } from '../screens/Templates';
 function ScrollToTop() {
   const { pathname } = useLocation();
   // Before paint, so a new screen never draws at the old screen's scroll position.
-  useLayoutEffect(() => window.scrollTo(0, 0), [pathname]);
+  // The braces matter: newer Chrome returns a Promise from scrollTo, and React would call
+  // whatever an effect returns as its clean-up when the screen changes.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
