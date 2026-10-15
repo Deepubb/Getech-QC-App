@@ -45,15 +45,12 @@ export function Home() {
 
         {!sorted.length && !masterLists.length ? (
           <Empty icon={<FileSpreadsheet />} title="No machine lists yet">
-            <p>Once someone publishes the team master Excel, the machines appear here by themselves. To publish it, open Settings on a PC.</p>
             <Link className="btn btn-primary" to="/settings">
               Go to Settings
             </Link>
           </Empty>
         ) : !sorted.length ? (
-          <Empty icon={<Camera />} title="No photo evidence yet">
-            <p>Pick a machine, type its FT number, then tap each photo name to take it. The zip comes out in the same folders as your Excel.</p>
-          </Empty>
+          <Empty icon={<Camera />} title="No photo evidence yet" />
         ) : (
           sorted.map((e) => {
             const p = evidenceProgress(e);

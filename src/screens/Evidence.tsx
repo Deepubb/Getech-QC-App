@@ -7,7 +7,6 @@ import { Thumb } from '../components/Thumb';
 import { AppBar, ConfirmSheet, Field, Sheet, toast } from '../components/ui';
 import { evidenceBytes, evidencePhotoCount, evidenceProgress, progressOf, setTitle } from '../core/evidence';
 import { fmtSize, plural } from '../core/format';
-import { usesFixture } from '../core/masterList';
 import { hasChanges, listHash, rebaseOnList } from '../core/rebase';
 import { useApp } from '../data/store';
 
@@ -23,7 +22,6 @@ export function EvidenceScreen() {
 
   const p = evidenceProgress(e);
   const n = evidencePhotoCount(e);
-  const fixture = usesFixture({ folders: e.folders.map((f) => ({ name: f.name, shots: f.items })) });
   const list = masterLists.find((l) => l.machine.toLowerCase() === e.machine.toLowerCase());
   const hash = list ? listHash(list.folders) : '';
   const change = list && hash !== e.dismissedList ? rebaseOnList(e.folders, list.folders) : null;
@@ -121,7 +119,6 @@ export function EvidenceScreen() {
             <Pencil className="muted" />
             <span className="t">
               <b>Change FT number</b>
-              <div className="s">{fixture ? 'Also renames photos that use {fixture}' : 'Used in the zip name'}</div>
             </span>
             <span />
           </button>
@@ -147,7 +144,7 @@ export function EvidenceScreen() {
             toast('FT number saved.', 'good');
           }}
         >
-          <Field label="FT number" hint={fixture ? 'Fills {fixture} in the photo names.' : 'Used in the zip name.'}>
+          <Field label="FT number">
             <input className="mono" value={ft} onChange={(ev) => setFt(ev.target.value)} autoFocus />
           </Field>
           <button className="btn btn-primary btn-block" type="submit" disabled={!ft.trim()}>
@@ -158,7 +155,7 @@ export function EvidenceScreen() {
       <ConfirmSheet
         open={sheet === 'apply' && showChange}
         title="Apply new names?"
-        body={`${describe(change ?? { added: 0, removed: 0, kept: 0 })} Photos already taken are never deleted; a photo whose name was removed or renamed stays under its old name, marked "not on the list".`}
+        body={`${describe(change ?? { added: 0, removed: 0, kept: 0 })} Photos already taken are kept.`}
         confirmLabel="Apply"
         onClose={() => setSheet(null)}
         onConfirm={async () => {

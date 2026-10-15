@@ -256,9 +256,7 @@ function ItemSheet({
             <ImagePlus /> Gallery
           </button>
         </div>
-        {item.photos.length ? (
-          <p className="hint">Extra photos are saved as {name}_2.jpg, {name}_3.jpg.</p>
-        ) : item.extra ? null : item.na ? (
+        {item.photos.length || item.extra ? null : item.na ? (
           <button className="btn btn-block" onClick={() => void setNa(false).then(onClose)}>
             <Undo2 /> Needed after all
           </button>
@@ -366,9 +364,7 @@ function ExtraSheet({
             <span className="hint mono wrap-anywhere">
               Saved as {safeName(folder.name)}/{[...itemPath(shot, e.ft), itemName(shot, e.ft)].join('/')}.jpg
             </span>
-          ) : (
-            <span className="hint">Use "Subfolder &gt; Name" to put it in a subfolder.</span>
-          )}
+          ) : null}
         </label>
         <div className="btn-row">
           <button type="submit" className="btn btn-amber" disabled={!ok}>

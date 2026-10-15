@@ -37,10 +37,10 @@ export function Settings() {
         <MachineLists />
 
         <section className="card stack">
-          <Field label="Your name" hint="Saved with new photo evidence.">
+          <Field label="Your name">
             <input defaultValue={settings.engineerName} onBlur={(e) => e.target.value.trim() && void saveSettings({ engineerName: e.target.value.trim() })} />
           </Field>
-          <Field label="Split photo zips larger than" hint="90 MB keeps each part under WhatsApp's document limit of about 100 MB.">
+          <Field label="Split photo zips larger than">
             <select value={String(settings.splitMB)} onChange={(e) => void saveSettings({ splitMB: Number(e.target.value) })}>
               {[25, 50, 90, 200, 500].map((n) => (
                 <option key={n} value={n}>

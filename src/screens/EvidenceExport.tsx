@@ -120,7 +120,7 @@ export function EvidenceExport() {
                 <b>
                   {pack.parts.length > 1 ? `${pack.parts.length} zip parts` : 'Zip ready'} · {fmtSize(pack.totalBytes)}
                 </b>
-                {pack.parts.length > 1 ? <p className="hint">Split into parts under {settings.splitMB} MB so each fits WhatsApp. Send every part; each keeps the same folders.</p> : null}
+                {pack.parts.length > 1 ? <p className="hint">Send every part.</p> : null}
                 <div className="filelist">
                   {pack.parts.map((p, i) => (
                     <div key={p.name}>
@@ -162,7 +162,6 @@ export function EvidenceExport() {
           </div>
           <div className="eyebrow">Inside {zipBaseName(e)}.zip</div>
           <div className="tree">{treeLines(zipEntries(e).map((z) => z.path)).join('\n') || 'No photos yet.'}</div>
-          <p className="hint">The same folders and names as the master list. Nothing else is added.</p>
         </section>
       </main>
     </div>

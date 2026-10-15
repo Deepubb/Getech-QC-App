@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppBar, Empty, Field, toast } from '../components/ui';
 import { safeName, setTitle } from '../core/evidence';
 import { plural } from '../core/format';
-import { fillFixture, shotCount, usesFixture } from '../core/masterList';
+import { shotCount } from '../core/masterList';
 import { useApp } from '../data/store';
 
 export function NewEvidence() {
@@ -14,8 +14,6 @@ export function NewEvidence() {
   const [listId, setListId] = useState(sorted.length === 1 ? sorted[0].id : '');
   const [ft, setFt] = useState('');
   const list = masterLists.find((l) => l.id === listId);
-  const fixture = list ? usesFixture(list) : false;
-  const example = list?.folders.flatMap((f) => f.shots).find((s) => /\{\s*(fixture|ft)\s*\}/i.test(s.name));
   const same = list && ft.trim() ? evidence.find((x) => x.machine.toLowerCase() === list.machine.toLowerCase() && x.ft.toLowerCase() === ft.trim().toLowerCase()) : undefined;
 
   async function start() {
@@ -31,7 +29,6 @@ export function NewEvidence() {
         <AppBar title="New photo evidence" back="/" />
         <main className="content">
           <Empty icon={<FileSpreadsheet />} title="No machine lists yet">
-            <p>The team master Excel has not reached this phone yet. Check for it in Settings, or publish it from a PC.</p>
             <Link className="btn btn-primary" to="/settings">
               Go to Settings
             </Link>
@@ -71,13 +68,7 @@ export function NewEvidence() {
                 <span className="bad">
                   {setTitle(same)} already has photo evidence. <Link to={`/evidence/${same.id}`}>Open it</Link> instead?
                 </span>
-              ) : fixture && example ? (
-                <span>
-                  Fills {'{fixture}'} in the photo names, e.g. <span className="mono">{fillFixture(example.name, ft || 'FT')}</span>
-                </span>
-              ) : (
-                'Used in the zip name.'
-              )
+              ) : undefined
             }
           >
             <input className="mono" value={ft} onChange={(e) => setFt(e.target.value)} placeholder="e.g. FT1234" autoCapitalize="characters" />

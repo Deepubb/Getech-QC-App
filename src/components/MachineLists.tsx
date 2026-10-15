@@ -1,7 +1,7 @@
 import { FileSpreadsheet, Loader2, RefreshCw, Trash2, TriangleAlert, Upload, Users } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { fmtDate, fmtDateTime, plural } from '../core/format';
-import { diffLists, shotCount, usesFixture, type ParsedList } from '../core/masterList';
+import { diffLists, shotCount, type ParsedList } from '../core/masterList';
 import type { PublishError } from '../data/remote';
 import { useApp } from '../data/store';
 import { ConfirmSheet, Sheet, toast } from './ui';
@@ -64,11 +64,11 @@ export function MachineLists() {
           {team ? (
             <span>
               <b>Team master list</b> published {fmtDateTime(team.publishedAt)}
-              {team.publishedBy ? ` by ${team.publishedBy}` : ''}. Phones pick up a newer one when the app opens.
+              {team.publishedBy ? ` by ${team.publishedBy}` : ''}.
             </span>
           ) : (
             <span>
-              <b>No team master list yet.</b> Publish the master Excel from a PC and every phone picks it up when the app opens.
+              <b>No team master list yet.</b>
             </span>
           )}
           <span>
@@ -88,7 +88,6 @@ export function MachineLists() {
                 <b>{l.machine}</b>
                 <div className="s">
                   {plural(l.folders.length, 'folder')} · {plural(shotCount(l), 'photo')}
-                  {usesFixture(l) ? ' · uses FT number' : ''}
                 </div>
                 <div className="s wrap-anywhere">
                   {l.source} · {fmtDate(l.updatedAt)}
@@ -102,10 +101,6 @@ export function MachineLists() {
         </div>
       ) : null}
 
-      <p className="hint">
-        Each sheet of the master Excel is one machine, named after the sheet. Row 1 holds the main folders; every name below is a photo. &ldquo;EPSON &gt; Loader
-        Robot&rdquo; puts the photo in an EPSON subfolder.
-      </p>
       <button className="btn btn-primary btn-block" disabled={reading} onClick={() => pick('team')}>
         {reading ? <Loader2 className="spin" /> : <Upload />}
         Publish master Excel to the team
@@ -149,7 +144,7 @@ export function MachineLists() {
       <ConfirmSheet
         open={!!toRemove}
         title={`Delete ${toRemove?.machine ?? 'machine'}?`}
-        body="Its list is removed from this phone until the next team update. Photo evidence already started for it stays."
+        body="Its list is removed from this phone."
         confirmLabel="Delete"
         danger
         onClose={() => setRemove(null)}
@@ -198,7 +193,6 @@ function UploadSheet({
               <span className="t">
                 <b>{l.machine}</b>
                 <div className="s">{l.folders.map((f) => `${f.name} ${f.shots.length}`).join(' · ')}</div>
-                {usesFixture(l) ? <div className="s">Uses {'{fixture}'}: filled from the FT number when you start.</div> : null}
               </span>
               {!d ? (
                 <span className="chip ok">New</span>
@@ -233,7 +227,6 @@ function UploadSheet({
           </span>
         </div>
       ) : null}
-      <p className="hint">Photo evidence already started keeps its names until someone taps Apply new names on that machine.</p>
 
       {team ? (
         <>
