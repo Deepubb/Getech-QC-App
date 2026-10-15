@@ -4,7 +4,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json' with { type: 'json' };
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    // Shown in Settings so anyone can tell which deploy their phone is running.
+    __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
+  },
   build: { chunkSizeWarningLimit: 1000 },
   plugins: [
     react(),

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { logProblem } from '../data/problemLog';
 
 const RELOAD_KEY = 'getech-qc-auto-reload-at';
 
@@ -20,6 +21,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(error, info.componentStack);
+    logProblem(`${error.name}: ${error.message}`);
     if (!isForeignDomError(error)) return;
     let last = 0;
     try {

@@ -6,7 +6,16 @@ export function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    // The browser only looks for a new version on a full page load, which an installed app
+    // rarely does. Look again whenever the app comes back to the screen, and every 30 minutes.
+    onRegisteredSW(_url, reg) {
+      if (!reg) return;
+      const check = () => void reg.update().catch(() => undefined);
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+      setInterval(check, 30 * 60 * 1000);
+    },
+  });
   if (!needRefresh) return null;
   return (
     <div className="toast-wrap" style={{ top: 'auto', bottom: 'calc(84px + var(--safe-bottom))', pointerEvents: 'auto' }}>

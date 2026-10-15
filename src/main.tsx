@@ -8,6 +8,9 @@ import './styles.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
+import { watchProblems } from './data/problemLog';
+
+watchProblems();
 
 // iPhone Safari ignores user-scalable=no, so block its pinch gestures directly.
 // Two-finger moves are cancelled everywhere; single-finger scrolling is untouched.

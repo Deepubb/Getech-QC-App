@@ -1,10 +1,11 @@
-import { HardDrive, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Copy, HardDrive, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { TabBar } from '../components/TabBar';
 import { AppBar, ConfirmSheet, Field, toast } from '../components/ui';
 import { safeName } from '../core/evidence';
 import { fmtSize } from '../core/format';
 import type { ThemeChoice } from '../core/types';
+import { clearProblems, readProblems } from '../data/problemLog';
 import { useApp } from '../data/store';
 
 export function Settings() {
@@ -13,6 +14,7 @@ export function Settings() {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [wipe, setWipe] = useState(false);
   const [newCat, setNewCat] = useState('');
+  const [problems, setProblems] = useState(readProblems);
   const cats = settings.defaultCategories;
   const addCat = () => {
     const n = safeName(newCat);
@@ -130,11 +132,54 @@ export function Settings() {
           <dl className="kv">
             <dt>Version</dt>
             <dd className="mono">{__APP_VERSION__}</dd>
+            <dt>Build</dt>
+            <dd className="mono">{__APP_BUILD__}</dd>
             <dt>Sign-in</dt>
             <dd>None. Your phone lock protects the data.</dd>
             <dt>Where data lives</dt>
             <dd>Only on this phone</dd>
           </dl>
+          <div className="stack" style={{ gap: 8 }}>
+            <b className="small">Problem log</b>
+            {problems.length ? (
+              <>
+                <pre className="tree" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                  {problems
+                    .slice()
+                    .reverse()
+                    .map((p) => `${p.at.slice(0, 19).replace('T', ' ')}  ${p.path}\n${p.message}`)
+                    .join('\n\n')}
+                </pre>
+                <div className="row">
+                  <button
+                    className="btn btn-sm"
+                    onClick={async () => {
+                      const text = [`Build ${__APP_BUILD__}`, navigator.userAgent, ...problems.map((p) => `${p.at} ${p.path} ${p.message}`)].join('\n');
+                      try {
+                        await navigator.clipboard.writeText(text);
+                        toast('Problem log copied.', 'good');
+                      } catch {
+                        toast('Could not copy. Take a screenshot instead.', 'bad');
+                      }
+                    }}
+                  >
+                    <Copy /> Copy
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => {
+                      clearProblems();
+                      setProblems([]);
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="small muted">No problems recorded on this phone.</p>
+            )}
+          </div>
           <button className="btn btn-danger" onClick={() => setWipe(true)}>
             <Trash2 /> Delete all data on this phone
           </button>

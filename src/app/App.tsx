@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, type RoutesProps } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastHost } from '../components/ui';
@@ -21,7 +21,8 @@ import { Templates } from '../screens/Templates';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Before paint, so a new screen never draws at the old screen's scroll position.
+  useLayoutEffect(() => window.scrollTo(0, 0), [pathname]);
   return null;
 }
 
