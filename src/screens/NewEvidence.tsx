@@ -12,14 +12,22 @@ export function NewEvidence() {
   const { masterLists, evidence, createEvidence } = useApp();
   const sorted = [...masterLists].sort((a, b) => a.machine.localeCompare(b.machine));
   const [listId, setListId] = useState(sorted.length === 1 ? sorted[0].id : '');
-  const [ft, setFt] = useState('');
+  // Machine numbers start with the machine name (SSDLV133), so picking a machine fills that in.
+  const [number, setNumber] = useState(sorted.length === 1 ? sorted[0].machine : '');
   const list = masterLists.find((l) => l.id === listId);
-  const same = list && ft.trim() ? evidence.find((x) => x.machine.toLowerCase() === list.machine.toLowerCase() && x.ft.toLowerCase() === ft.trim().toLowerCase()) : undefined;
+  const clean = safeName(number);
+  const ready = !!list && !!clean && clean.toLowerCase() !== list.machine.toLowerCase();
+  const same = ready ? evidence.find((x) => x.number.toLowerCase() === clean.toLowerCase()) : undefined;
+
+  function choose(id: string, machine: string) {
+    setListId(id);
+    setNumber((n) => (!safeName(n) || sorted.some((x) => x.machine.toLowerCase() === safeName(n).toLowerCase()) ? machine : n));
+  }
 
   async function start() {
     if (!list) return toast('Pick the machine first.', 'bad');
-    if (!safeName(ft)) return toast('Type the FT number.', 'bad');
-    const id = await createEvidence(list.id, ft);
+    if (!ready) return toast('Type the machine number.', 'bad');
+    const id = await createEvidence(list.id, number);
     nav(`/evidence/${id}`, { replace: true });
   }
 
@@ -47,7 +55,7 @@ export function NewEvidence() {
         </div>
         <div className="list" role="radiogroup" aria-label="Machine">
           {sorted.map((l) => (
-            <button key={l.id} className="li" role="radio" aria-checked={l.id === listId} onClick={() => setListId(l.id)}>
+            <button key={l.id} className="li" role="radio" aria-checked={l.id === listId} onClick={() => choose(l.id, l.machine)}>
               {l.id === listId ? <CheckCircle2 style={{ color: 'var(--amber)' }} /> : <Circle className="muted" />}
               <span className="t">
                 <b>{l.machine}</b>
@@ -62,7 +70,7 @@ export function NewEvidence() {
 
         <div className="card stack">
           <Field
-            label="FT number"
+            label="Machine number"
             hint={
               same ? (
                 <span className="bad">
@@ -71,11 +79,11 @@ export function NewEvidence() {
               ) : undefined
             }
           >
-            <input className="mono" value={ft} onChange={(e) => setFt(e.target.value)} placeholder="e.g. FT1234" autoCapitalize="characters" />
+            <input className="mono" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="e.g. SSDLV133" autoCapitalize="characters" />
           </Field>
         </div>
 
-        <button className="btn btn-primary btn-block" onClick={start} disabled={!list || !safeName(ft)}>
+        <button className="btn btn-primary btn-block" onClick={start} disabled={!ready}>
           Start taking photos
         </button>
       </main>

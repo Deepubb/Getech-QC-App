@@ -32,6 +32,8 @@ export interface EvidencePhoto {
   id: string;
   takenAt: string;
   bytes: number;
+  /** FT number of the fixture in this photo, for names with {fixture}. */
+  ft?: string;
 }
 
 /**
@@ -41,7 +43,7 @@ export interface EvidencePhoto {
 export interface EvidenceItem {
   id: string;
   path: string[];
-  /** As written in the list; {fixture} is filled in from the FT number when files are named. */
+  /** As written in the list; {fixture} is filled in from each photo's FT number. */
   name: string;
   extra: boolean;
   na: boolean;
@@ -58,8 +60,8 @@ export interface EvidenceFolder {
 export interface EvidenceSet extends SyncFields {
   /** The master list (sheet) name, e.g. SSDLV. */
   machine: string;
-  /** FT number of this machine; fills {fixture} in photo names. */
-  ft: string;
+  /** This machine's number, e.g. SSDLV133. Also the zip name. */
+  number: string;
   engineer: string;
   exportedAt: string | null;
   folders: EvidenceFolder[];

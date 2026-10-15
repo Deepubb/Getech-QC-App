@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { groupByPath, nameClash, nextMissing, photoFileName, progressOf, safeName, zipBaseName, zipClashes, zipEntries } from './evidence';
+import { ftMissing, groupByPath, itemName, nameClash, needsFt, nextMissing, photoFileNames, progressOf, safeName, usedFts, zipBaseName, zipClashes, zipEntries } from './evidence';
 import { treeLines } from './tree';
 import type { EvidenceItem, EvidenceSet } from './types';
 
-const ph = (id: string) => ({ id, takenAt: '2026-10-15T08:00:00Z', bytes: 100 });
+const ph = (id: string, ft?: string, takenAt = '2026-10-15T08:00:00Z') => ({ id, takenAt, bytes: 100, ...(ft !== undefined ? { ft } : {}) });
 const item = (id: string, name: string, path: string[] = [], photos: string[] = [], o: Partial<EvidenceItem> = {}): EvidenceItem => ({
-  id, path, name, extra: false, na: false, photos: photos.map(ph), ...o,
+  id, path, name, extra: false, na: false, photos: photos.map((p) => ph(p)), ...o,
 });
-const set = (folders: [string, EvidenceItem[]][], ft = 'FT1234'): EvidenceSet => ({
-  id: 'e', machine: 'SSDLV', ft, engineer: '', createdAt: '', updatedAt: '', deviceId: '', exportedAt: null,
+const set = (folders: [string, EvidenceItem[]][], number = 'SSDLV133'): EvidenceSet => ({
+  id: 'e', machine: 'SSDLV', number, engineer: '', createdAt: '', updatedAt: '', deviceId: '', exportedAt: null,
   folders: folders.map(([name, items], i) => ({ id: `f${i}`, name, items })),
 });
 
@@ -22,17 +22,42 @@ describe('safeName', () => {
   });
 });
 
+describe('FT numbers per photo', () => {
+  const gripper = item('g', 'Loader Robot_Gripper_{fixture}', ['EPSON'], [], { photos: [ph('a', 'FT01'), ph('b', 'FT02'), ph('c', 'FT01'), ph('d')] });
+  it('knows which names need an FT number', () => {
+    expect(needsFt(gripper)).toBe(true);
+    expect(needsFt(item('x', 'CCTV'))).toBe(false);
+  });
+  it('shows [FT] where the FT number goes', () => {
+    expect(itemName(gripper)).toBe('Loader Robot_Gripper_[FT]');
+  });
+  it('names each photo with its own FT number, numbering repeats', () => {
+    expect(photoFileNames(gripper)).toEqual([
+      'Loader Robot_Gripper_FT01.jpg',
+      'Loader Robot_Gripper_FT02.jpg',
+      'Loader Robot_Gripper_FT01_2.jpg',
+      'Loader Robot_Gripper_{fixture}.jpg',
+    ]);
+  });
+  it('lists photos still waiting for an FT number, and the FT numbers used, newest first', () => {
+    const e = set([['Machine Verification', [gripper]]]);
+    expect(ftMissing(e).map((x) => x.photo.id)).toEqual(['d']);
+    const e2 = set([['M', [item('i', 'X_{fixture}', [], [], { photos: [ph('1', 'FT01', '2026-10-15T08:00:00Z'), ph('2', 'ft09', '2026-10-15T09:00:00Z')] })]]]);
+    expect(usedFts(e2)).toEqual(['ft09', 'FT01']);
+  });
+});
+
 describe('zipEntries', () => {
   const e = set([
     ['Machine Verification', [item('1', 'CCTV', [], ['a']), item('2', 'Loader Robot Specification', ['EPSON'], ['b', 'c']), item('3', 'KVM 1', ['KVM'])]],
-    ['Function Verification', [item('4', 'ET_Inspection_{fixture}_ResultOK', ['Vision Master'], ['d'])]],
+    ['Function Verification', [item('4', 'ET_Inspection_{fixture}_ResultOK', ['Vision Master'], [], { photos: [ph('d', 'FT07')] })]],
   ]);
   it('puts photos at Folder/Name.jpg, or Folder/Subfolder/Name.jpg, with _2 for extra photos', () => {
     expect(zipEntries(e).map((z) => z.path)).toEqual([
       'Machine Verification/CCTV.jpg',
       'Machine Verification/EPSON/Loader Robot Specification.jpg',
       'Machine Verification/EPSON/Loader Robot Specification_2.jpg',
-      'Function Verification/Vision Master/ET_Inspection_FT1234_ResultOK.jpg',
+      'Function Verification/Vision Master/ET_Inspection_FT07_ResultOK.jpg',
     ]);
   });
   it('draws them as a folder tree', () => {
@@ -44,11 +69,12 @@ describe('zipEntries', () => {
       '│     └─ Loader Robot Specification_2.jpg',
       '└─ Function Verification/',
       '   └─ Vision Master/',
-      '      └─ ET_Inspection_FT1234_ResultOK.jpg',
+      '      └─ ET_Inspection_FT07_ResultOK.jpg',
     ]);
   });
-  it('names the zip after the machine and FT number', () => {
-    expect(zipBaseName(e)).toBe('SSDLV_FT1234');
+  it('names the zip after the machine number', () => {
+    expect(zipBaseName(e)).toBe('SSDLV133');
+    expect(zipBaseName({ machine: 'SSDLV', number: '' })).toBe('SSDLV');
   });
 });
 
@@ -71,8 +97,8 @@ describe('progress', () => {
 describe('name clashes', () => {
   const e = set([['Machine Verification', [item('1', 'CCTV', [], ['a']), item('2', 'Robot', ['EPSON'])]]]);
   it('spots a photo added on site that matches an existing name in the same place', () => {
-    expect(nameClash(e.folders[0], [], 'cctv', e.ft)).toBe(true);
-    expect(nameClash(e.folders[0], ['EPSON'], 'CCTV', e.ft)).toBe(false);
+    expect(nameClash(e.folders[0], [], 'cctv')).toBe(true);
+    expect(nameClash(e.folders[0], ['EPSON'], 'CCTV')).toBe(false);
   });
   it('blocks export when two photos would get the same file', () => {
     const bad = set([['F', [item('1', 'A', [], ['a', 'b']), item('2', 'A_2', [], ['c'], { extra: true })]]]);
@@ -80,6 +106,6 @@ describe('name clashes', () => {
     expect(zipClashes(e)).toEqual([]);
   });
   it('numbers extra photos of one item', () => {
-    expect([0, 1, 2].map((i) => photoFileName({ name: 'CCTV' }, i, ''))).toEqual(['CCTV.jpg', 'CCTV_2.jpg', 'CCTV_3.jpg']);
+    expect(photoFileNames(item('x', 'CCTV', [], ['a', 'b', 'c']))).toEqual(['CCTV.jpg', 'CCTV_2.jpg', 'CCTV_3.jpg']);
   });
 });

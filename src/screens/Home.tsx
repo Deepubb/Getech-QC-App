@@ -5,7 +5,7 @@ import { EvidenceChip } from '../components/StatusChip';
 import { TabBar } from '../components/TabBar';
 import { Thumb } from '../components/Thumb';
 import { Empty } from '../components/ui';
-import { allItems, evidenceBytes, evidencePhotoCount, evidenceProgress } from '../core/evidence';
+import { allItems, evidenceBytes, evidencePhotoCount, evidenceProgress, setTitle } from '../core/evidence';
 import { fmtSize, plural, timeAgo } from '../core/format';
 import { daysSince, evidenceLabel } from '../core/rules';
 import { useApp } from '../data/store';
@@ -60,8 +60,8 @@ export function Home() {
               <Link key={e.id} to={`/evidence/${e.id}`} className="card card-link stack">
                 <div className="between" style={{ alignItems: 'flex-start' }}>
                   <div className="grow">
-                    <h3 style={{ fontSize: 19 }}>{e.machine}</h3>
-                    <div className="mono small muted wrap-anywhere">{e.ft ? `FT ${e.ft}` : 'No FT number'}</div>
+                    <h3 style={{ fontSize: 19 }} className="wrap-anywhere">{setTitle(e)}</h3>
+                    <div className="small muted">{e.machine}</div>
                   </div>
                   <EvidenceChip e={e} />
                 </div>

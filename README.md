@@ -3,7 +3,7 @@
 Installable web app (PWA) for QC buyoff photo evidence on iPhone and Android.
 
 1. On a PC, open the app, go to **Settings** and **publish** the team master Excel. Each sheet is one machine, named after the sheet. Every phone picks up the new list when the app opens.
-2. Start photo evidence for a machine and type its FT number.
+2. Start photo evidence for a machine and type its machine number (e.g. `SSDLV133`).
 3. Tap each photo name and take the photo; the app names it. Items can be marked not applicable, get extra photos (`_2`, `_3`) or be added on site.
 4. Export one zip laid out like the sheet. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
 
@@ -73,13 +73,13 @@ worker/
 - The sheet name is the machine name (for example `SSDLV`).
 - Row 1 holds the main folders. Every cell below a heading is one photo for that folder.
 - `A > B` puts photo `B` in subfolder `A`. Without `>`, the cell is the photo name.
-- `{fixture}` is filled with the FT number typed when the machine is started.
+- `{fixture}` is a fixture's FT number. After taking such a photo the app asks for its FT number; one name can have photos for many fixtures (`Gripper_FT01.jpg`, `Gripper_FT02.jpg`).
 
-The zip for the table above, for FT number `FT1234`, is `SSDLV_FT1234.zip`:
+The zip for the table above, for machine `SSDLV133` and fixture `FT07`, is `SSDLV133.zip`:
 
 ```text
 Function Verification/Arm reached limit_Loader.jpg
-Function Verification/Vision Master/ET_Inspection_FT1234_ResultOK.jpg
+Function Verification/Vision Master/ET_Inspection_FT07_ResultOK.jpg
 Machine Verification/CCTV.jpg
 Machine Verification/EPSON/Loader Robot Specification.jpg
 ESD Measurement/ESD/Drive Drop Pad.jpg

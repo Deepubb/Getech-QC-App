@@ -5,7 +5,7 @@ import { buildEvidencePack } from './evidencePack';
 
 const MB = 1024 * 1024;
 const set = (folders: [string, [string, string[], number][]][]): EvidenceSet => ({
-  id: 'e1', machine: 'SSDLV', ft: 'FT1234', engineer: 'Deepak',
+  id: 'e1', machine: 'SSDLV', number: 'SSDLV133', engineer: 'Deepak',
   createdAt: '2026-10-15T00:00:00Z', updatedAt: '2026-10-15T00:00:00Z', deviceId: 'd', exportedAt: null,
   folders: folders.map(([name, items], fi) => ({
     id: `f${fi}`,
@@ -26,7 +26,7 @@ describe('buildEvidencePack', () => {
       ['ESD Measurement', [['EPSON_Loader', ['ESD'], 1000], ['EPSON_Loader', ['Ground'], 1000]]],
     ]);
     const pack = await buildEvidencePack(e, loader(e), 90);
-    expect(pack.parts.map((p) => p.name)).toEqual(['SSDLV_FT1234.zip']);
+    expect(pack.parts.map((p) => p.name)).toEqual(['SSDLV133.zip']);
     const files = Object.keys(await unzip(pack.parts[0].blob)).filter((f) => !f.endsWith('/'));
     expect(files).toEqual([
       'Machine Verification/CCTV.jpg',
@@ -39,7 +39,7 @@ describe('buildEvidencePack', () => {
   it('splits into parts under the limit and keeps the folders in every part', async () => {
     const e = set([['Safety', [['A', [], 0.6 * MB], ['B', [], 0.6 * MB]]], ['Functional', [['C', ['Sub'], 0.6 * MB]]]]);
     const pack = await buildEvidencePack(e, loader(e), 1);
-    expect(pack.parts.map((p) => p.name)).toEqual(['SSDLV_FT1234_part1of3.zip', 'SSDLV_FT1234_part2of3.zip', 'SSDLV_FT1234_part3of3.zip']);
+    expect(pack.parts.map((p) => p.name)).toEqual(['SSDLV133_part1of3.zip', 'SSDLV133_part2of3.zip', 'SSDLV133_part3of3.zip']);
     expect(Object.keys(await unzip(pack.parts[2].blob))).toEqual(['Functional/Sub/C.jpg']);
   });
 });

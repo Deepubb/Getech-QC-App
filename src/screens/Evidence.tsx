@@ -5,7 +5,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { EvidenceChip } from '../components/StatusChip';
 import { Thumb } from '../components/Thumb';
 import { AppBar, ConfirmSheet, Field, Sheet, toast } from '../components/ui';
-import { evidenceBytes, evidencePhotoCount, evidenceProgress, progressOf, setTitle } from '../core/evidence';
+import { evidenceBytes, evidencePhotoCount, evidenceProgress, progressOf, safeName, setTitle } from '../core/evidence';
 import { fmtSize, plural } from '../core/format';
 import { hasChanges, listHash, rebaseOnList } from '../core/rebase';
 import { useApp } from '../data/store';
@@ -16,8 +16,8 @@ export function EvidenceScreen() {
   const { evidence, masterLists, updateEvidence, deleteEvidence, applyList, dismissList } = useApp();
   const e = evidence.find((x) => x.id === id);
   const [menu, setMenu] = useState(false);
-  const [sheet, setSheet] = useState<'ft' | 'delete' | 'apply' | null>(null);
-  const [ft, setFt] = useState(e?.ft ?? '');
+  const [sheet, setSheet] = useState<'number' | 'delete' | 'apply' | null>(null);
+  const [number, setNumber] = useState(e?.number ?? '');
   if (!e) return <Navigate to="/" replace />;
 
   const p = evidenceProgress(e);
@@ -30,8 +30,8 @@ export function EvidenceScreen() {
   return (
     <div className="shell">
       <AppBar
-        title={e.machine}
-        sub={e.ft ? `FT ${e.ft}` : 'No FT number'}
+        title={setTitle(e)}
+        sub={e.machine}
         back="/"
         actions={
           <button className="iconbtn" aria-label="More actions" onClick={() => setMenu(true)}>
@@ -115,10 +115,10 @@ export function EvidenceScreen() {
 
       <Sheet open={menu} onClose={() => setMenu(false)} title={setTitle(e)}>
         <div className="list">
-          <button className="li" onClick={() => (setMenu(false), setFt(e.ft), setSheet('ft'))}>
+          <button className="li" onClick={() => (setMenu(false), setNumber(e.number), setSheet('number'))}>
             <Pencil className="muted" />
             <span className="t">
-              <b>Change FT number</b>
+              <b>Change machine number</b>
             </span>
             <span />
           </button>
@@ -133,21 +133,21 @@ export function EvidenceScreen() {
         </div>
       </Sheet>
 
-      <Sheet open={sheet === 'ft'} onClose={() => setSheet(null)} title="FT number">
+      <Sheet open={sheet === 'number'} onClose={() => setSheet(null)} title="Machine number">
         <form
           className="stack"
           onSubmit={async (ev) => {
             ev.preventDefault();
-            if (!ft.trim()) return;
-            await updateEvidence(e.id, (d) => void (d.ft = ft.trim()));
+            if (!safeName(number)) return;
+            await updateEvidence(e.id, (d) => void (d.number = safeName(number)));
             setSheet(null);
-            toast('FT number saved.', 'good');
+            toast('Machine number saved.', 'good');
           }}
         >
-          <Field label="FT number">
-            <input className="mono" value={ft} onChange={(ev) => setFt(ev.target.value)} autoFocus />
+          <Field label="Machine number">
+            <input className="mono" value={number} onChange={(ev) => setNumber(ev.target.value)} autoFocus autoCapitalize="characters" />
           </Field>
-          <button className="btn btn-primary btn-block" type="submit" disabled={!ft.trim()}>
+          <button className="btn btn-primary btn-block" type="submit" disabled={!safeName(number)}>
             Save
           </button>
         </form>

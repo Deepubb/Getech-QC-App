@@ -69,14 +69,18 @@ export const shotCount = (l: Pick<MasterList, 'folders'>) => l.folders.reduce((a
 
 const PLACEHOLDER = /\{\s*(fixture|ft)\s*\}/gi;
 
-export const usesFixture = (l: Pick<MasterList, 'folders'>) =>
-  l.folders.some((f) => f.shots.some((s) => [...s.path, s.name].some((p) => new RegExp(PLACEHOLDER.source, 'i').test(p))));
+export const hasFixture = (text: string) => new RegExp(PLACEHOLDER.source, 'i').test(text);
+
+export const usesFixture = (l: Pick<MasterList, 'folders'>) => l.folders.some((f) => f.shots.some((s) => [...s.path, s.name].some(hasFixture)));
 
 /** Fills {fixture} with the FT number. Left as written until an FT number is given. */
 export function fillFixture(text: string, ft: string): string {
   const v = safeName(ft);
   return v ? text.replace(PLACEHOLDER, v) : text;
 }
+
+/** How a name with {fixture} reads before an FT number is given: "End Effector_[FT]". */
+export const showFixture = (text: string) => text.replace(PLACEHOLDER, '[FT]');
 
 /** What uploading a new version of a list changes, counted by folder/subfolder/name. */
 export function diffLists(before: Pick<MasterList, 'folders'>, after: Pick<MasterList, 'folders'>) {

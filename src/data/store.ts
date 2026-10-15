@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { processImage } from '../camera/processImage';
-import { safeName } from '../core/evidence';
+import { needsFt, safeName } from '../core/evidence';
 import { uid, nowISO } from '../core/ids';
 import { diffLists, type ParsedList } from '../core/masterList';
 import { plural } from '../core/format';
@@ -31,11 +31,12 @@ interface AppState {
   applyList(evidenceId: string): Promise<void>;
   dismissList(evidenceId: string, hash: string): Promise<void>;
 
-  createEvidence(listId: string, ft: string): Promise<string>;
+  createEvidence(listId: string, number: string): Promise<string>;
   updateEvidence(id: string, change: (e: EvidenceSet) => void, opts?: { touch?: boolean }): Promise<void>;
   deleteEvidence(id: string): Promise<void>;
-  /** Stores the photo straight away so it can never be lost. With `replaceId`, it takes that photo's place. */
-  addPhoto(evidenceId: string, itemId: string, file: Blob, replaceId?: string): Promise<void>;
+  /** Stores the photo straight away so it can never be lost. With `replaceId`, it takes that photo's place (and FT number). */
+  addPhoto(evidenceId: string, itemId: string, file: Blob, replaceId?: string): Promise<string>;
+  setPhotoFt(evidenceId: string, itemId: string, photoId: string, ft: string): Promise<void>;
   deletePhoto(evidenceId: string, itemId: string, photoId: string): Promise<void>;
   addExtraItem(evidenceId: string, folderId: string, path: string[], name: string): Promise<string>;
   deleteItem(evidenceId: string, itemId: string): Promise<void>;
@@ -56,7 +57,7 @@ const findItem = (e: EvidenceSet, itemId: string) => e.folders.flatMap((f) => f.
  * Before version 3, photo evidence had free categories with a typed name per photo.
  * Each category becomes a folder and each name an extra item, so nothing taken is lost.
  */
-type OldSet = Omit<EvidenceSet, 'folders' | 'machine' | 'ft'> & {
+type OldSet = Omit<EvidenceSet, 'folders' | 'machine' | 'number'> & {
   title?: string;
   machineCode?: string;
   categories?: { name: string; photos: (EvidencePhoto & { name: string })[] }[];
@@ -77,7 +78,21 @@ function migrateEvidence(raw: EvidenceSet | OldSet): EvidenceSet | null {
   });
   const { title, machineCode, categories: _drop, ...rest } = old;
   void _drop;
-  return { ...rest, machine: safeName(title) || safeName(machineCode) || 'Machine', ft: safeName(machineCode), folders };
+  return { ...rest, machine: safeName(title) || safeName(machineCode) || 'Machine', number: safeName(machineCode) || safeName(title), folders };
+}
+
+/**
+ * Earlier builds of version 3 had one "FT number" per machine. It identified the machine, so it
+ * becomes the machine number, and photos that used it for {fixture} keep it as their own FT number.
+ */
+function migrateFt(e: EvidenceSet & { ft?: string }): EvidenceSet | null {
+  if (typeof e.number === 'string') return null;
+  const { ft = '', ...rest } = e;
+  const folders = rest.folders.map((f) => ({
+    ...f,
+    items: f.items.map((i) => (needsFt(i) ? { ...i, photos: i.photos.map((p) => ({ ...p, ft: p.ft ?? ft })) } : i)),
+  }));
+  return { ...rest, number: ft || rest.machine, folders };
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -95,9 +110,10 @@ export const useApp = create<AppState>((set, get) => ({
       if (!data.settings) await saveSettingsDoc(settings);
       const evidence = await Promise.all(
         (data.evidence as (EvidenceSet | OldSet)[]).map(async (e) => {
-          const migrated = migrateEvidence(e);
-          if (migrated) await putDoc('evidence', migrated);
-          return migrated ?? (e as EvidenceSet);
+          const current = migrateEvidence(e) ?? (e as EvidenceSet);
+          const migrated = migrateFt(current);
+          if (migrated || current !== e) await putDoc('evidence', migrated ?? current);
+          return migrated ?? current;
         }),
       );
       const team = (await getMeta<TeamInfo>('team')) ?? null;
@@ -189,7 +205,7 @@ export const useApp = create<AppState>((set, get) => ({
     await get().updateEvidence(evidenceId, (d) => void (d.dismissedList = hash), { touch: false });
   },
 
-  async createEvidence(listId, ft) {
+  async createEvidence(listId, number) {
     const list = get().masterLists.find((l) => l.id === listId);
     if (!list) throw new Error('That machine list is no longer on this phone.');
     const t = nowISO();
@@ -200,7 +216,7 @@ export const useApp = create<AppState>((set, get) => ({
       updatedAt: t,
       deviceId: get().settings.deviceId,
       machine: list.machine,
-      ft: ft.trim(),
+      number: safeName(number),
       engineer: get().settings.engineerName,
       exportedAt: null,
       folders: list.folders.map((f) => ({
@@ -239,11 +255,19 @@ export const useApp = create<AppState>((set, get) => ({
       const item = findItem(e, itemId);
       if (!item) return;
       const at = replaceId ? item.photos.findIndex((p) => p.id === replaceId) : -1;
-      if (at >= 0) item.photos[at] = photo;
+      if (at >= 0) item.photos[at] = { ...photo, ...(item.photos[at].ft ? { ft: item.photos[at].ft } : {}) };
       else item.photos.push(photo);
       item.na = false;
     });
     if (replaceId) await deletePhotos([replaceId]);
+    return photo.id;
+  },
+
+  async setPhotoFt(evidenceId, itemId, photoId, ft) {
+    await get().updateEvidence(evidenceId, (e) => {
+      const p = findItem(e, itemId)?.photos.find((x) => x.id === photoId);
+      if (p) p.ft = safeName(ft);
+    });
   },
 
   async deletePhoto(evidenceId, itemId, photoId) {

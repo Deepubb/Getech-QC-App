@@ -126,7 +126,7 @@ export function MachineLists() {
           onClose={() => setUpload(null)}
           onPhone={async () => {
             await saveMasterLists(upload.lists, upload.file);
-            toast(`${plural(upload.lists.length, 'machine')} saved on this phone. The next team update replaces them.`, 'good');
+            toast(`${plural(upload.lists.length, 'machine')} saved.`, 'good');
             setUpload(null);
           }}
           onPublish={async () => {

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { EvidenceChip } from '../components/StatusChip';
 import { AppBar, toast } from '../components/ui';
-import { evidencePhotoCount, isMissing, itemName, itemPath, setTitle, zipBaseName, zipClashes, zipEntries } from '../core/evidence';
+import { evidencePhotoCount, ftMissing, isMissing, itemName, itemPath, setTitle, zipBaseName, zipClashes, zipEntries } from '../core/evidence';
 import { fmtDateTime, fmtSize, plural } from '../core/format';
 import { nowISO } from '../core/ids';
 import { treeLines } from '../core/tree';
@@ -21,7 +21,8 @@ export function EvidenceExport() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const clashes = e ? zipClashes(e) : [];
-  const blocked = clashes.length > 0;
+  const noFt = e ? ftMissing(e) : [];
+  const blocked = clashes.length > 0 || noFt.length > 0;
 
   // Build the zip as soon as the screen opens, so Share can run straight from the tap.
   const version = e?.updatedAt;
@@ -88,7 +89,7 @@ export function EvidenceExport() {
                   <ul className="small">
                     {items.map((i) => (
                       <li key={i.id} className="wrap-anywhere">
-                        {[...itemPath(i, e.ft), itemName(i, e.ft)].join(' › ')}
+                        {[...itemPath(i), itemName(i)].join(' › ')}
                       </li>
                     ))}
                   </ul>
@@ -98,7 +99,19 @@ export function EvidenceExport() {
           </details>
         ) : null}
 
-        {blocked ? (
+        {noFt.length ? (
+          <div className="banner bad">
+            <TriangleAlert />
+            <span className="stack" style={{ gap: 6 }}>
+              <b>{plural(noFt.length, 'photo')} still {noFt.length === 1 ? 'needs' : 'need'} an FT number.</b>
+              {[...new Map(noFt.map((x) => [x.item.id, x])).values()].map(({ folder, item }) => (
+                <Link key={item.id} to={`/evidence/${e.id}/f/${folder.id}`} className="wrap-anywhere" style={{ color: 'inherit' }}>
+                  {folder.name} › {[...itemPath(item), itemName(item)].join(' › ')}
+                </Link>
+              ))}
+            </span>
+          </div>
+        ) : clashes.length ? (
           <div className="banner bad">
             <TriangleAlert />
             <span>
