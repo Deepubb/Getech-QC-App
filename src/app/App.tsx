@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, type RoutesProps } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { TeamSync } from '../components/TeamSync';
 import { ToastHost } from '../components/ui';
 import { UpdatePrompt } from '../components/UpdatePrompt';
 import { useApp } from '../data/store';
@@ -100,6 +101,7 @@ export function App() {
       </ScreenBoundary>
       <ToastHost />
       <UpdatePrompt />
+      <TeamSync />
     </BrowserRouter>
   );
 }

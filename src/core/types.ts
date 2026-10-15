@@ -63,7 +63,20 @@ export interface EvidenceSet extends SyncFields {
   engineer: string;
   exportedAt: string | null;
   folders: EvidenceFolder[];
+  /** listHash of a newer master list the engineer chose not to apply. */
+  dismissedList?: string;
 }
+
+/** The team master list as published to Cloudflare from someone's PC. */
+export interface TeamMaster {
+  version: string;
+  publishedAt: string;
+  publishedBy: string;
+  source: string;
+  lists: { machine: string; folders: ListFolder[] }[];
+}
+
+export type TeamInfo = Omit<TeamMaster, 'lists'>;
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 

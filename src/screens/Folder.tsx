@@ -193,7 +193,7 @@ function ItemRow({ item, ft, isNext, busy, onTap, onMore }: { item: EvidenceItem
             ) : (
               'Tap to take'
             )}
-            {item.extra ? ' · added on site' : ''}
+            {item.extra ? ' · not on the list' : ''}
           </div>
         </span>
       </button>

@@ -31,7 +31,7 @@ export function NewEvidence() {
         <AppBar title="New photo evidence" back="/" />
         <main className="content">
           <Empty icon={<FileSpreadsheet />} title="No machine lists yet">
-            <p>Upload the master Excel in Settings first. Each sheet becomes a machine with its folders and photo names.</p>
+            <p>The team master Excel has not reached this phone yet. Check for it in Settings, or publish it from a PC.</p>
             <Link className="btn btn-primary" to="/settings">
               Go to Settings
             </Link>

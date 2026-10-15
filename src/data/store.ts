@@ -2,9 +2,12 @@ import { create } from 'zustand';
 import { processImage } from '../camera/processImage';
 import { safeName } from '../core/evidence';
 import { uid, nowISO } from '../core/ids';
-import type { ParsedList } from '../core/masterList';
-import type { EvidenceFolder, EvidenceItem, EvidencePhoto, EvidenceSet, MasterList, Settings } from '../core/types';
+import { diffLists, type ParsedList } from '../core/masterList';
+import { plural } from '../core/format';
+import { rebaseOnList } from '../core/rebase';
+import type { EvidenceFolder, EvidenceItem, EvidencePhoto, EvidenceSet, MasterList, Settings, TeamInfo } from '../core/types';
 import { deleteDoc, deletePhotos, getMeta, loadAll, putDoc, putPhoto, saveSettingsDoc, setMeta, wipeDatabase } from './db';
+import { fetchTeamMaster, publishTeamMaster, type PublishError } from './remote';
 
 interface AppState {
   ready: boolean;
@@ -12,6 +15,8 @@ interface AppState {
   settings: Settings;
   evidence: EvidenceSet[];
   masterLists: MasterList[];
+  /** The team master list this phone last downloaded. */
+  team: TeamInfo | null;
 
   init(): Promise<void>;
   saveSettings(patch: Partial<Settings>): Promise<void>;
@@ -19,6 +24,12 @@ interface AppState {
   /** Adds new machines and replaces lists of machines already known (matched by name). */
   saveMasterLists(lists: ParsedList[], source: string): Promise<void>;
   deleteMasterList(id: string): Promise<void>;
+  /** Downloads the team master list if it changed. Returns a line for the engineer, or null when nothing changed. */
+  syncTeam(): Promise<string | null>;
+  publishTeam(lists: ParsedList[], source: string, passcode: string): Promise<{ ok: true; message: string } | { ok: false; error: PublishError }>;
+  /** Moves a machine in progress onto the current master list for its machine. */
+  applyList(evidenceId: string): Promise<void>;
+  dismissList(evidenceId: string, hash: string): Promise<void>;
 
   createEvidence(listId: string, ft: string): Promise<string>;
   updateEvidence(id: string, change: (e: EvidenceSet) => void, opts?: { touch?: boolean }): Promise<void>;
@@ -75,6 +86,7 @@ export const useApp = create<AppState>((set, get) => ({
   settings: defaultSettings(),
   evidence: [],
   masterLists: [],
+  team: null,
 
   async init() {
     try {
@@ -88,7 +100,8 @@ export const useApp = create<AppState>((set, get) => ({
           return migrated ?? (e as EvidenceSet);
         }),
       );
-      set({ evidence, masterLists: data.masterLists, settings, ready: true });
+      const team = (await getMeta<TeamInfo>('team')) ?? null;
+      set({ evidence, masterLists: data.masterLists, settings, team, ready: true });
       // Ask once for persistent storage so the browser does not evict inspections.
       if (!(await getMeta<boolean>('persistAsked')) && navigator.storage?.persist) {
         await setMeta('persistAsked', true);
@@ -122,6 +135,58 @@ export const useApp = create<AppState>((set, get) => ({
   async deleteMasterList(id) {
     set({ masterLists: get().masterLists.filter((l) => l.id !== id) });
     await deleteDoc('masterLists', id);
+  },
+
+  async syncTeam() {
+    const remote = await fetchTeamMaster();
+    const known = get().team;
+    if (!remote || remote.version === known?.version) return null;
+    const before = get().masterLists;
+    // The team list is the source of truth: machines missing from it are removed from the phone.
+    const gone = before.filter((l) => !remote.lists.some((r) => sameName(r.machine, l.machine)));
+    for (const l of gone) await deleteDoc('masterLists', l.id);
+    set({ masterLists: before.filter((l) => !gone.includes(l)) });
+    await get().saveMasterLists(
+      remote.lists.map((l) => ({ ...l, warnings: [] })),
+      remote.source,
+    );
+    const { version, publishedAt, publishedBy, source } = remote;
+    const team = { version, publishedAt, publishedBy, source };
+    await setMeta('team', team);
+    set({ team });
+    if (!known) return `Master list downloaded: ${plural(remote.lists.length, 'machine')}.`;
+    const changes = remote.lists
+      .map((l) => {
+        const old = before.find((b) => sameName(b.machine, l.machine));
+        if (!old) return `${l.machine} new`;
+        const d = diffLists(old, l);
+        return d.added || d.removed ? `${l.machine} +${d.added} −${d.removed}` : '';
+      })
+      .concat(gone.map((l) => `${l.machine} removed`))
+      .filter(Boolean);
+    return changes.length ? `Master list updated: ${changes.join(', ')}` : null;
+  },
+
+  async publishTeam(lists, source, passcode) {
+    const r = await publishTeamMaster(lists, source, get().settings.engineerName, passcode);
+    if (!r.ok) return r;
+    await get().syncTeam();
+    return { ok: true, message: `Published to the team: ${plural(lists.length, 'machine')}.` };
+  },
+
+  async applyList(evidenceId) {
+    const e = get().evidence.find((x) => x.id === evidenceId);
+    const list = e && get().masterLists.find((l) => sameName(l.machine, e.machine));
+    if (!e || !list) return;
+    const r = rebaseOnList(e.folders, list.folders);
+    await get().updateEvidence(evidenceId, (d) => {
+      d.folders = r.folders;
+      delete d.dismissedList;
+    });
+  },
+
+  async dismissList(evidenceId, hash) {
+    await get().updateEvidence(evidenceId, (d) => void (d.dismissedList = hash), { touch: false });
   },
 
   async createEvidence(listId, ft) {
@@ -209,6 +274,7 @@ export const useApp = create<AppState>((set, get) => ({
     await wipeDatabase();
     const settings = { ...defaultSettings(), ...keep };
     await saveSettingsDoc(settings);
+    if (get().team) await setMeta('team', get().team);
     // Machine lists are set-up, not work, so they stay.
     set({ evidence: [], settings });
   },

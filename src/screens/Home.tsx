@@ -44,8 +44,8 @@ export function Home() {
         ) : null}
 
         {!sorted.length && !masterLists.length ? (
-          <Empty icon={<FileSpreadsheet />} title="Add your machine lists first">
-            <p>Upload the master Excel in Settings. Each sheet is a machine; its columns become folders and the names below become photo names.</p>
+          <Empty icon={<FileSpreadsheet />} title="No machine lists yet">
+            <p>Once someone publishes the team master Excel, the machines appear here by themselves. To publish it, open Settings on a PC.</p>
             <Link className="btn btn-primary" to="/settings">
               Go to Settings
             </Link>

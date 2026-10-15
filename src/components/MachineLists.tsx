@@ -1,25 +1,42 @@
-import { FileSpreadsheet, Loader2, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { FileSpreadsheet, Loader2, RefreshCw, Trash2, TriangleAlert, Upload, Users } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { fmtDate, plural } from '../core/format';
+import { fmtDate, fmtDateTime, plural } from '../core/format';
 import { diffLists, shotCount, usesFixture, type ParsedList } from '../core/masterList';
 import { useApp } from '../data/store';
-import { ConfirmSheet, Sheet, toast } from './ui';
+import { ConfirmSheet, Field, Sheet, toast } from './ui';
 
 interface Upload {
   file: string;
   lists: ParsedList[];
   skipped: string[];
+  mode: 'team' | 'phone';
 }
 
-/** Settings section: the machines this phone knows, each from one sheet of a master Excel. */
+const PASSCODE_KEY = 'getech-qc-publish-passcode';
+const readPasscode = () => {
+  try {
+    return localStorage.getItem(PASSCODE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+/** Settings section: the team master list and the machines this phone knows. */
 export function MachineLists() {
-  const { masterLists, saveMasterLists, deleteMasterList } = useApp();
+  const { masterLists, team, saveMasterLists, deleteMasterList, syncTeam, publishTeam } = useApp();
   const input = useRef<HTMLInputElement>(null);
+  const mode = useRef<Upload['mode']>('team');
   const [reading, setReading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [upload, setUpload] = useState<Upload | null>(null);
   const [remove, setRemove] = useState<string | null>(null);
   const sorted = [...masterLists].sort((a, b) => a.machine.localeCompare(b.machine));
   const toRemove = masterLists.find((l) => l.id === remove);
+
+  const pick = (m: Upload['mode']) => {
+    mode.current = m;
+    input.current?.click();
+  };
 
   async function read(file: File) {
     setReading(true);
@@ -27,12 +44,19 @@ export function MachineLists() {
       const { readMasterWorkbook } = await import('../core/readWorkbook');
       const r = readMasterWorkbook(await file.arrayBuffer());
       if (!r.lists.length) toast('No sheet in that file has folder headings with photo names below them.', 'bad');
-      else setUpload({ file: file.name, ...r });
+      else setUpload({ file: file.name, mode: mode.current, ...r });
     } catch {
       toast('That file could not be read. Save it as .xlsx and try again.', 'bad');
     } finally {
       setReading(false);
     }
+  }
+
+  async function checkNow() {
+    setChecking(true);
+    const message = await syncTeam();
+    setChecking(false);
+    toast(message ?? (team ? 'You have the latest master list.' : 'No team master list found yet.'), message ? 'good' : 'info');
   }
 
   return (
@@ -41,10 +65,28 @@ export function MachineLists() {
         <FileSpreadsheet className="muted" />
         <b>Machines</b>
       </div>
-      <p className="hint">
-        Each sheet of the master Excel is one machine, named after the sheet. Row 1 holds the main folders; every name below is a photo. &ldquo;EPSON &gt; Loader
-        Robot&rdquo; puts the photo in an EPSON subfolder.
-      </p>
+
+      <div className="banner info">
+        <Users />
+        <span className="stack" style={{ gap: 6 }}>
+          {team ? (
+            <span>
+              <b>Team master list</b> published {fmtDateTime(team.publishedAt)}
+              {team.publishedBy ? ` by ${team.publishedBy}` : ''}. Phones pick up a newer one when the app opens.
+            </span>
+          ) : (
+            <span>
+              <b>No team master list yet.</b> Publish the master Excel from a PC and every phone picks it up when the app opens.
+            </span>
+          )}
+          <span>
+            <button className="btn btn-sm" disabled={checking} onClick={() => void checkNow()}>
+              {checking ? <Loader2 className="spin" /> : <RefreshCw />} Check now
+            </button>
+          </span>
+        </span>
+      </div>
+
       {sorted.length ? (
         <div className="list">
           {sorted.map((l) => (
@@ -67,9 +109,17 @@ export function MachineLists() {
           ))}
         </div>
       ) : null}
-      <button className="btn btn-primary btn-block" disabled={reading} onClick={() => input.current?.click()}>
+
+      <p className="hint">
+        Each sheet of the master Excel is one machine, named after the sheet. Row 1 holds the main folders; every name below is a photo. &ldquo;EPSON &gt; Loader
+        Robot&rdquo; puts the photo in an EPSON subfolder.
+      </p>
+      <button className="btn btn-primary btn-block" disabled={reading} onClick={() => pick('team')}>
         {reading ? <Loader2 className="spin" /> : <Upload />}
-        {sorted.length ? 'Add or update machines (Excel)' : 'Upload master Excel'}
+        Publish master Excel to the team
+      </button>
+      <button className="btn btn-ghost btn-sm" disabled={reading} onClick={() => pick('phone')}>
+        Use a file on this phone only
       </button>
       <input
         ref={input}
@@ -84,63 +134,36 @@ export function MachineLists() {
       />
 
       {upload ? (
-        <Sheet open onClose={() => setUpload(null)} title={plural(upload.lists.length, 'machine') + ' found'}>
-          <div className="tiny muted mono wrap-anywhere">{upload.file}</div>
-          <div className="list">
-            {upload.lists.map((l) => {
-              const existing = masterLists.find((x) => x.machine.toLowerCase() === l.machine.toLowerCase());
-              const d = existing ? diffLists(existing, l) : null;
-              return (
-                <div key={l.machine} className="li" style={{ gridTemplateColumns: '1fr auto' }}>
-                  <span className="t">
-                    <b>{l.machine}</b>
-                    <div className="s">
-                      {l.folders.map((f) => `${f.name} ${f.shots.length}`).join(' · ')}
-                    </div>
-                    {usesFixture(l) ? <div className="s">Uses {'{fixture}'}: filled from the FT number when you start.</div> : null}
-                  </span>
-                  {!d ? (
-                    <span className="chip ok">New</span>
-                  ) : d.added || d.removed ? (
-                    <span className="chip warn">
-                      +{d.added} −{d.removed}
-                    </span>
-                  ) : (
-                    <span className="chip">No change</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {upload.lists.some((l) => l.warnings.length) || upload.skipped.length ? (
-            <div className="banner">
-              <TriangleAlert />
-              <span className="stack" style={{ gap: 4 }}>
-                {upload.lists.flatMap((l) => l.warnings.map((w) => `${l.machine}: ${w}`)).map((w) => (
-                  <span key={w}>{w}</span>
-                ))}
-                {upload.skipped.length ? <span>Sheets with nothing to use: {upload.skipped.join(', ')}.</span> : null}
-              </span>
-            </div>
-          ) : null}
-          <p className="hint">Photo evidence already started keeps the list it started with.</p>
-          <button
-            className="btn btn-primary btn-block"
-            onClick={async () => {
-              await saveMasterLists(upload.lists, upload.file);
-              toast(`${plural(upload.lists.length, 'machine')} saved.`, 'good');
+        <UploadSheet
+          upload={upload}
+          onClose={() => setUpload(null)}
+          onPhone={async () => {
+            await saveMasterLists(upload.lists, upload.file);
+            toast(`${plural(upload.lists.length, 'machine')} saved on this phone. The next team update replaces them.`, 'good');
+            setUpload(null);
+          }}
+          onPublish={async (passcode) => {
+            const r = await publishTeam(upload.lists, upload.file, passcode);
+            if (r.ok) {
+              toast(r.message, 'good');
               setUpload(null);
-            }}
-          >
-            Save {plural(upload.lists.length, 'machine')}
-          </button>
-        </Sheet>
+              return null;
+            }
+            return r.error === 'passcode'
+              ? 'That passcode is not right.'
+              : r.error === 'not_set_up'
+                ? 'Publishing is not set up on Cloudflare yet.'
+                : r.error === 'offline'
+                  ? 'No connection. Try again when you are online.'
+                  : 'Publishing failed. Try again.';
+          }}
+        />
       ) : null}
 
       <ConfirmSheet
         open={!!toRemove}
         title={`Delete ${toRemove?.machine ?? 'machine'}?`}
-        body="Its list is removed from this phone. Photo evidence already started for it stays."
+        body="Its list is removed from this phone until the next team update. Photo evidence already started for it stays."
         confirmLabel="Delete"
         danger
         onClose={() => setRemove(null)}
@@ -150,5 +173,114 @@ export function MachineLists() {
         }}
       />
     </section>
+  );
+}
+
+function UploadSheet({
+  upload,
+  onClose,
+  onPhone,
+  onPublish,
+}: {
+  upload: Upload;
+  onClose: () => void;
+  onPhone: () => Promise<void>;
+  onPublish: (passcode: string) => Promise<string | null>;
+}) {
+  const masterLists = useApp((s) => s.masterLists);
+  const [passcode, setPasscode] = useState(readPasscode);
+  const [remember, setRemember] = useState(() => !!readPasscode());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const team = upload.mode === 'team';
+  const dropped = team ? masterLists.filter((m) => !upload.lists.some((l) => l.machine.toLowerCase() === m.machine.toLowerCase())) : [];
+
+  async function publish() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (remember) localStorage.setItem(PASSCODE_KEY, passcode);
+      else localStorage.removeItem(PASSCODE_KEY);
+    } catch {
+      /* storage blocked: the passcode is just not remembered */
+    }
+    setError(await onPublish(passcode));
+    setBusy(false);
+  }
+
+  return (
+    <Sheet open onClose={onClose} title={team ? 'Publish to the team' : 'Use on this phone'}>
+      <div className="tiny muted mono wrap-anywhere">{upload.file}</div>
+      <div className="list">
+        {upload.lists.map((l) => {
+          const existing = masterLists.find((x) => x.machine.toLowerCase() === l.machine.toLowerCase());
+          const d = existing ? diffLists(existing, l) : null;
+          return (
+            <div key={l.machine} className="li" style={{ gridTemplateColumns: '1fr auto' }}>
+              <span className="t">
+                <b>{l.machine}</b>
+                <div className="s">{l.folders.map((f) => `${f.name} ${f.shots.length}`).join(' · ')}</div>
+                {usesFixture(l) ? <div className="s">Uses {'{fixture}'}: filled from the FT number when you start.</div> : null}
+              </span>
+              {!d ? (
+                <span className="chip ok">New</span>
+              ) : d.added || d.removed ? (
+                <span className="chip warn">
+                  +{d.added} −{d.removed}
+                </span>
+              ) : (
+                <span className="chip">No change</span>
+              )}
+            </div>
+          );
+        })}
+        {dropped.map((m) => (
+          <div key={m.id} className="li" style={{ gridTemplateColumns: '1fr auto' }}>
+            <span className="t">
+              <b>{m.machine}</b>
+              <div className="s">Not in this file, so it is removed for everyone.</div>
+            </span>
+            <span className="chip nok">Removed</span>
+          </div>
+        ))}
+      </div>
+      {upload.lists.some((l) => l.warnings.length) || upload.skipped.length ? (
+        <div className="banner">
+          <TriangleAlert />
+          <span className="stack" style={{ gap: 4 }}>
+            {upload.lists.flatMap((l) => l.warnings.map((w) => `${l.machine}: ${w}`)).map((w) => (
+              <span key={w}>{w}</span>
+            ))}
+            {upload.skipped.length ? <span>Sheets with nothing to use: {upload.skipped.join(', ')}.</span> : null}
+          </span>
+        </div>
+      ) : null}
+      <p className="hint">Photo evidence already started keeps its names until someone taps Apply new names on that machine.</p>
+
+      {team ? (
+        <form
+          className="stack"
+          onSubmit={(ev) => {
+            ev.preventDefault();
+            if (passcode) void publish();
+          }}
+        >
+          <Field label="Team passcode" hint={error ? <span className="bad">{error}</span> : 'Set once in Cloudflare. Ask your QC lead.'}>
+            <input type="password" value={passcode} onChange={(ev) => setPasscode(ev.target.value)} autoComplete="current-password" />
+          </Field>
+          <label className="check small">
+            <input type="checkbox" checked={remember} onChange={(ev) => setRemember(ev.target.checked)} />
+            <span>Remember the passcode on this device</span>
+          </label>
+          <button className="btn btn-primary btn-block" type="submit" disabled={!passcode || busy}>
+            {busy ? <Loader2 className="spin" /> : <Upload />} Publish {plural(upload.lists.length, 'machine')} to everyone
+          </button>
+        </form>
+      ) : (
+        <button className="btn btn-primary btn-block" onClick={() => void onPhone()}>
+          Save {plural(upload.lists.length, 'machine')} on this phone
+        </button>
+      )}
+    </Sheet>
   );
 }

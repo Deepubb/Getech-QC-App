@@ -2,7 +2,7 @@
 
 Installable web app (PWA) for QC buyoff photo evidence on iPhone and Android.
 
-1. In **Settings**, upload a master Excel. Each sheet is one machine, named after the sheet.
+1. On a PC, open the app, go to **Settings** and **publish** the team master Excel with the team passcode. Each sheet is one machine, named after the sheet. Every phone picks up the new list when the app opens.
 2. Start photo evidence for a machine and type its FT number.
 3. Tap each photo name and take the photo; the app names it. Items can be marked not applicable, get extra photos (`_2`, `_3`) or be added on site.
 4. Export one zip laid out like the sheet. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
@@ -32,6 +32,17 @@ The camera, install to home screen, offline mode and file sharing only work over
    - Environment variable: `NODE_VERSION` = `20` or later
 4. Deploy. Cloudflare gives you an address like `https://<project>.pages.dev`. Every push to the main branch publishes a new version; other branches get preview addresses.
 
+### Team master list (one-time)
+
+Publishing the master Excel uses a Pages Function (`functions/api/master.ts`) and Cloudflare KV storage:
+
+1. **Storage & databases → KV → Create** a namespace, for example `getech-qc-master`.
+2. In the Pages project: **Settings → Bindings → Add → KV namespace**. Variable name `MASTER`, namespace `getech-qc-master`.
+3. **Settings → Variables and Secrets → Add**: type **Secret**, name `PUBLISH_PASSCODE`, value the team passcode (long, at least 10 characters).
+4. **Deployments → latest → Retry deployment**, so the binding and secret take effect.
+
+Anyone can read the list; only someone with the passcode can publish. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
+
 `public/_headers` stops the service worker from being cached, so phones pick up new versions. Phones show an **Update** prompt when a new version is ready.
 
 ## Install on a phone
@@ -45,11 +56,13 @@ The camera, install to home screen, offline mode and file sharing only work over
 src/
 ├── app/          App shell, routes, first-run and install gates
 ├── core/         Types, master list reading, naming and zip paths (pure, unit-tested)
-├── data/         IndexedDB access (db.ts) and the app store (store.ts)
+├── data/         IndexedDB access (db.ts), the app store (store.ts), team list fetch/publish (remote.ts)
 ├── camera/       Photo resize, time stamp, EXIF removal
 ├── export/       Evidence zip builder, split planning, share and download
 ├── components/   Shared UI (app bar, sheets, toasts, thumbnails, camera, machine lists)
 └── screens/      One file per screen
+functions/
+└── api/master.ts Team master list on Cloudflare (Pages Function + KV)
 ```
 
 ## Master Excel
@@ -75,4 +88,4 @@ ESD Measurement/ESD/Drive Drop Pad.jpg
 ESD Measurement/Ground/EPSON_Loader.jpg
 ```
 
-Uploading the file again updates machines with the same sheet name; photo evidence already started keeps the list it started with.
+Publishing again replaces the team list; a machine missing from the file is removed for everyone. Photo evidence already started keeps its names until someone taps **Apply new names** on that machine: new names are added, removed names without photos disappear, and photos are never deleted.
