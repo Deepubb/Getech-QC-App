@@ -2,7 +2,7 @@
  * /api/master: the team's master list of photo names.
  *
  * GET  returns the latest published list (404 until someone publishes).
- * POST publishes a new list. Anyone using the app can publish; the previous list is kept as a backup.
+ * POST publishes a new list. Anyone past the team code can publish; the previous list is kept as a backup.
  *
  * Needs a KV namespace bound as MASTER (see wrangler.jsonc).
  * The Excel is read on the publisher's PC; only machine, folder and photo names are sent here.
@@ -10,7 +10,7 @@
 
 interface KV {
   get(key: string): Promise<string | null>;
-  put(key: string, value: string): Promise<void>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
 }
 
 export interface Env {

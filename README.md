@@ -34,11 +34,18 @@ The app is a Cloudflare Worker: `worker/index.ts` serves the built app from `dis
 
 ### Team master list (one-time)
 
-The KV storage bound as `MASTER` is created by Cloudflare on the first deploy; nothing else is needed.
+The KV storage bound as `MASTER` is created by Cloudflare on the first deploy.
 
-Anyone using the app can read and publish the list. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
+### Team code (one-time)
 
-To try it locally: `npm run build`, then `npx wrangler dev`.
+Nothing is served until the team code is entered. Set it in the Worker: **Settings → Variables and Secrets → Add**, type **Secret**, name `TEAM_CODE`. Never put the code in this repository.
+
+- A correct entry sets an HttpOnly cookie for a year. It holds a signature made with the code, never the code itself.
+- Changing `TEAM_CODE` signs every phone out; the app then shows **Enter team code**. Photos already on phones stay.
+- Ten wrong tries from one address lock it out for 15 minutes.
+- Without `TEAM_CODE`, nobody gets in. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
+
+To try it locally: `npm run build`, put `TEAM_CODE=<any test code>` in `.dev.vars` (ignored by git), then `npx wrangler dev`.
 
 `public/_headers` stops the service worker from being cached, so phones pick up new versions. Phones show an **Update** prompt when a new version is ready.
 
@@ -59,7 +66,8 @@ src/
 ├── components/   Shared UI (app bar, sheets, toasts, thumbnails, camera, machine lists)
 └── screens/      One file per screen
 worker/
-├── index.ts      Cloudflare Worker: serves the app and /api/master
+├── index.ts      Cloudflare Worker: gate, then the app and /api/master
+├── gate.ts       Team code gate in front of every request
 └── master.ts     Team master list (KV storage)
 ```
 

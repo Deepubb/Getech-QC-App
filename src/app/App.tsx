@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, type RoutesProps } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { LockedBanner } from '../components/LockedBanner';
 import { TeamSync } from '../components/TeamSync';
 import { ToastHost } from '../components/ui';
 import { UpdatePrompt } from '../components/UpdatePrompt';
@@ -102,6 +103,7 @@ export function App() {
       <ToastHost />
       <UpdatePrompt />
       <TeamSync />
+      <LockedBanner />
     </BrowserRouter>
   );
 }

@@ -246,6 +246,8 @@ function UploadSheet({
 
 function publishMessage(r: { error: PublishError; missing?: string[] }): string {
   switch (r.error) {
+    case 'locked':
+      return 'Enter the team code again first.';
     case 'no_server':
       return 'Cloudflare is serving the app but not its server script. Check that the latest build in Cloudflare → Deployments finished.';
     case 'not_set_up': {

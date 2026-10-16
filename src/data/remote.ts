@@ -3,10 +3,14 @@ import type { ParsedList } from '../core/masterList';
 
 const URL = '/api/master';
 
-/** The latest team master list, or null when there is none, the phone is offline, or publishing is not set up. */
-export async function fetchTeamMaster(): Promise<TeamMaster | null> {
+/**
+ * The latest team master list, or null when there is none, the phone is offline, or publishing is
+ * not set up. 'locked' means this phone has to enter the team code (again) before it gets updates.
+ */
+export async function fetchTeamMaster(): Promise<TeamMaster | null | 'locked'> {
   try {
     const r = await fetch(URL, { cache: 'no-store', headers: { accept: 'application/json' } });
+    if (r.status === 401) return 'locked';
     if (!r.ok || !r.headers.get('content-type')?.includes('application/json')) return null;
     const m = (await r.json()) as TeamMaster;
     return m && typeof m.version === 'string' && Array.isArray(m.lists) ? m : null;
@@ -15,7 +19,7 @@ export async function fetchTeamMaster(): Promise<TeamMaster | null> {
   }
 }
 
-export type PublishError = 'not_set_up' | 'no_server' | 'offline' | 'failed';
+export type PublishError = 'locked' | 'not_set_up' | 'no_server' | 'offline' | 'failed';
 
 export async function publishTeamMaster(
   lists: ParsedList[],
@@ -36,6 +40,7 @@ export async function publishTeamMaster(
   const body = r.headers.get('content-type')?.includes('application/json') ? await r.json().catch(() => null) : null;
   // The Worker script always answers with JSON. Anything else means only the app's files are being served.
   if (!body) return { ok: false, error: 'no_server' };
+  if (r.status === 401) return { ok: false, error: 'locked' };
   if (r.status === 503) return { ok: false, error: 'not_set_up', missing: Array.isArray(body.missing) ? body.missing : [] };
   return { ok: false, error: 'failed' };
 }

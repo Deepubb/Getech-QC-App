@@ -17,6 +17,8 @@ interface AppState {
   masterLists: MasterList[];
   /** The team master list this phone last downloaded. */
   team: TeamInfo | null;
+  /** The server asked for the team code: this phone gets no updates until it is entered again. */
+  locked: boolean;
 
   init(): Promise<void>;
   saveSettings(patch: Partial<Settings>): Promise<void>;
@@ -102,6 +104,7 @@ export const useApp = create<AppState>((set, get) => ({
   evidence: [],
   masterLists: [],
   team: null,
+  locked: false,
 
   async init() {
     try {
@@ -154,7 +157,9 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async syncTeam() {
-    const remote = await fetchTeamMaster();
+    const result = await fetchTeamMaster();
+    if (result === 'locked' || get().locked) set({ locked: result === 'locked' });
+    const remote = result === 'locked' ? null : result;
     const known = get().team;
     if (!remote || remote.version === known?.version) return null;
     const before = get().masterLists;

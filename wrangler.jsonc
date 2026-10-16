@@ -11,8 +11,8 @@
     "binding": "ASSETS",
     // Any app address (e.g. /evidence/...) opens the app, so reloading a screen works.
     "not_found_handling": "single-page-application",
-    // The team list must reach the script, never the app's index page.
-    "run_worker_first": ["/api/*"]
+    // Every request goes through the script first, so nothing is served before the team code.
+    "run_worker_first": true
   },
   "kv_namespaces": [
     {
