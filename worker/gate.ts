@@ -33,6 +33,20 @@ async function token(code: string): Promise<string> {
     .replace(/=+$/, '');
 }
 
+/**
+ * The team code from the Worker's settings. Accepts small naming slips (team_code, Team-Code,
+ * a stray space) and trims the value, so a typo in the dashboard does not lock everyone out.
+ */
+export function teamCode(env: GateEnv): string {
+  const record = env as unknown as Record<string, unknown>;
+  const keys = ['TEAM_CODE', ...Object.keys(record).filter((k) => /^\s*team[\s_-]*code\s*$/i.test(k))];
+  for (const k of keys) {
+    const value = record[k];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
 /** Compares without leaking how much matched. */
 export function same(a: string, b: string): boolean {
   const x = new TextEncoder().encode(a);
@@ -58,7 +72,8 @@ const isPage = (request: Request) =>
 
 function page(status: number, opts: { error?: string; next?: string; notSetUp?: boolean } = {}): Response {
   const body = opts.notSetUp
-    ? '<p>The team code has not been set up yet.</p>'
+    ? `<div class="box"><p><b>The team code has not been set up yet.</b></p>
+       <p>In Cloudflare, open this Worker, then <b>Settings → Variables and Secrets</b> (not the Build section) and add a <b>Secret</b> named <b>TEAM_CODE</b>.</p></div>`
     : `<form method="post" action="/unlock">
         <input type="hidden" name="next" value="${(opts.next ?? '/').replace(/[&"<>]/g, '')}">
         <label for="code">Team code</label>
@@ -90,12 +105,12 @@ button{min-height:50px;border:0;border-radius:12px;background:#59ac8c;color:#0f2
   return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
 }
 
-const locked = (request: Request, env: GateEnv) => {
+const locked = (request: Request, code: string) => {
   if (isPage(request)) {
     const url = new URL(request.url);
     return Response.redirect(`${url.origin}/unlock?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
   }
-  return new Response(JSON.stringify({ error: env.TEAM_CODE ? 'locked' : 'not_set_up' }), {
+  return new Response(JSON.stringify({ error: code ? 'locked' : 'not_set_up' }), {
     status: 401,
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
@@ -107,10 +122,11 @@ const locked = (request: Request, env: GateEnv) => {
  */
 export async function gate(request: Request, env: GateEnv): Promise<Response | null> {
   const url = new URL(request.url);
-  const unlocked = !!env.TEAM_CODE && same(cookieValue(request, COOKIE), await token(env.TEAM_CODE));
+  const code = teamCode(env);
+  const unlocked = !!code && same(cookieValue(request, COOKIE), await token(code));
 
   if (url.pathname === '/unlock') {
-    if (!env.TEAM_CODE) return page(503, { notSetUp: true });
+    if (!code) return page(503, { notSetUp: true });
     if (request.method === 'GET') {
       if (unlocked) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get('next'))}`, 303);
       return page(200, { next: safeNext(url.searchParams.get('next')) });
@@ -124,7 +140,7 @@ export async function gate(request: Request, env: GateEnv): Promise<Response | n
     const next = safeNext(String(form?.get('next') ?? '/'));
     if (fails >= MAX_FAILS) return page(429, { next, error: 'Too many tries. Wait 15 minutes, then try again.' });
 
-    if (!same(String(form?.get('code') ?? ''), env.TEAM_CODE)) {
+    if (!same(String(form?.get('code') ?? '').trim(), code)) {
       await env.MASTER?.put(failKey, String(fails + 1), { expirationTtl: LOCK_SECONDS });
       await new Promise((r) => setTimeout(r, 600));
       return page(401, { next, error: 'That code is not right.' });
@@ -133,12 +149,12 @@ export async function gate(request: Request, env: GateEnv): Promise<Response | n
       status: 303,
       headers: {
         location: next,
-        'set-cookie': `${COOKIE}=${await token(env.TEAM_CODE)}; Max-Age=${YEAR}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+        'set-cookie': `${COOKIE}=${await token(code)}; Max-Age=${YEAR}; Path=/; HttpOnly; Secure; SameSite=Lax`,
         'cache-control': 'no-store',
       },
     });
   }
 
   if (unlocked || OPEN.has(url.pathname)) return null;
-  return locked(request, env);
+  return locked(request, code);
 }

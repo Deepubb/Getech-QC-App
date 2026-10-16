@@ -84,6 +84,19 @@ describe('team code gate', () => {
     expect((await worker.fetch(unlock(CODE, '/', '8.8.8.8'), e)).status).toBe(303);
   }, 20_000);
 
+  it('accepts small slips in the setting name and spaces around the code', async () => {
+    const e = { MASTER: kv(), ASSETS: assets, ' team_code ': `  ${CODE} ` };
+    const r = await worker.fetch(unlock(` ${CODE} `), e as never);
+    expect(r.status).toBe(303);
+    expect(await (await worker.fetch(page('/', { cookie: cookieFrom(r) }), e as never)).text()).toBe('APP');
+  });
+
+  it('says where to add the code when it is missing', async () => {
+    const html = await (await worker.fetch(page('/unlock'), env({ TEAM_CODE: undefined }))).text();
+    expect(html).toContain('Variables and Secrets');
+    expect(html).toContain('TEAM_CODE');
+  });
+
   it('lets nobody in when the code has not been set up', async () => {
     const e = env({ TEAM_CODE: undefined });
     expect((await worker.fetch(page('/'), e)).status).toBe(302);
