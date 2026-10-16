@@ -19,7 +19,7 @@ export default defineConfig({
         name: 'Getech QC',
         short_name: 'Getech QC',
         description: 'QC buyoff photo evidence, named and foldered from your machine list, offline on your phone.',
-        theme_color: '#13233f',
+        theme_color: '#3b3b3b',
         background_color: '#0b0e10',
         display: 'standalone',
         orientation: 'portrait',

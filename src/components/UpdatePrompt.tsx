@@ -28,7 +28,7 @@ export function UpdatePrompt() {
       <div className="toast" role="status">
         <RefreshCw />
         <span>A new version is ready.</span>
-        <button className="btn btn-sm btn-amber" onClick={() => updateServiceWorker(true)}>
+        <button className="btn btn-sm btn-accent" onClick={() => updateServiceWorker(true)}>
           Update
         </button>
         <button className="btn btn-sm btn-ghost" style={{ color: 'inherit' }} onClick={() => setNeedRefresh(false)}>

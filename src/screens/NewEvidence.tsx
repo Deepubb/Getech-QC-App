@@ -56,7 +56,7 @@ export function NewEvidence() {
         <div className="list" role="radiogroup" aria-label="Machine">
           {sorted.map((l) => (
             <button key={l.id} className="li" role="radio" aria-checked={l.id === listId} onClick={() => choose(l.id, l.machine)}>
-              {l.id === listId ? <CheckCircle2 style={{ color: 'var(--amber)' }} /> : <Circle className="muted" />}
+              {l.id === listId ? <CheckCircle2 style={{ color: 'var(--accent-ink)' }} /> : <Circle className="muted" />}
               <span className="t">
                 <b>{l.machine}</b>
                 <div className="s">

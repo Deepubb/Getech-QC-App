@@ -33,7 +33,7 @@ createRoot(root, {
     if (reloadOnce()) return;
     root.innerHTML =
       '<div class="gate" role="alert"><h1>Something went wrong</h1><p>Your inspections and photos are safe on this phone.</p>' +
-      '<button class="btn btn-amber btn-block" onclick="location.reload()">Reload</button></div>';
+      '<button class="btn btn-accent btn-block" onclick="location.reload()">Reload</button></div>';
   },
 }).render(
   <StrictMode>

@@ -156,7 +156,7 @@ function FolderView({ e, folder }: { e: EvidenceSet; folder: EvidenceFolder }) {
       <div className="actionbar">
         <div>
           {next ? (
-            <button className="btn btn-amber btn-block" style={{ minHeight: 58 }} disabled={camera.busy} onClick={() => camera.open({ itemId: next.id })}>
+            <button className="btn btn-accent btn-block" style={{ minHeight: 58 }} disabled={camera.busy} onClick={() => camera.open({ itemId: next.id })}>
               {camera.busy ? <Loader2 className="spin" /> : <Camera />}
               <span className="wrap-anywhere" style={{ textAlign: 'left' }}>
                 {camera.busy ? (
@@ -399,7 +399,7 @@ function ItemSheet({
           </div>
         ) : null}
         <div className="btn-row">
-          <button className="btn btn-amber" onClick={() => onCapture({ itemId: item.id }, 'camera')}>
+          <button className="btn btn-accent" onClick={() => onCapture({ itemId: item.id }, 'camera')}>
             <Camera /> {item.photos.length ? (fixture ? 'Another FT' : 'Add photo') : 'Take photo'}
           </button>
           <button className="btn" onClick={() => onCapture({ itemId: item.id }, 'gallery')}>
@@ -533,7 +533,7 @@ function ExtraSheet({
           ) : null}
         </label>
         <div className="btn-row">
-          <button type="submit" className="btn btn-amber" disabled={!ok}>
+          <button type="submit" className="btn btn-accent" disabled={!ok}>
             <Camera /> Take photo
           </button>
           <button type="button" className="btn" disabled={!ok} onClick={() => take('gallery')}>

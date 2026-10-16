@@ -68,7 +68,7 @@ export function Welcome() {
           <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="e.g. Deepak" autoFocus />
         </label>
         <p className="small">No password. Everything stays on this phone until you export it.</p>
-        <button className="btn btn-amber btn-block" type="submit" disabled={!name.trim()}>
+        <button className="btn btn-accent btn-block" type="submit" disabled={!name.trim()}>
           Get started
         </button>
       </div>

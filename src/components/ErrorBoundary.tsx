@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, { error: Error | null }> {
         <h1>This screen could not open</h1>
         <p>Your inspections and photos are safe on this phone. Reload to carry on.</p>
         <div className="panel">
-          <button className="btn btn-amber btn-block" onClick={() => window.location.reload()}>
+          <button className="btn btn-accent btn-block" onClick={() => window.location.reload()}>
             Reload
           </button>
           <button
