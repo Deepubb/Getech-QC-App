@@ -39,3 +39,24 @@ export async function checkForUpdate(): Promise<boolean> {
     });
   });
 }
+
+/**
+ * Switches to the downloaded version and reloads. The new version also reloads open windows
+ * itself (public/sw-reload.js); this reload covers a browser that does not.
+ */
+export async function applyUpdate(): Promise<void> {
+  const waiting = registration?.waiting;
+  if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, 3000);
+    navigator.serviceWorker?.addEventListener(
+      'controllerchange',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+  window.location.reload();
+}

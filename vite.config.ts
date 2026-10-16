@@ -34,6 +34,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: '/index.html',
+        // Reloads open windows when a new version takes over (public/sw-reload.js).
+        importScripts: ['sw-reload.js'],
         navigateFallbackDenylist: [/^\/api\//, /^\/unlock/],
       },
     }),
