@@ -1,27 +1,40 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { checkForUpdate, safeToUpdate, setRegistration } from '../app/updates';
 
-/** Shows a reload button when a new version has been downloaded in the background. */
+/** Installs a new version by itself as soon as it is safe; until then shows that one is ready. */
 export function UpdatePrompt() {
   const {
-    needRefresh: [needRefresh, setNeedRefresh],
+    needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    // The browser only looks for a new version on a full page load, which an installed app
-    // rarely does. Look again whenever the app comes back to the screen, and every 30 minutes.
     onRegisteredSW(_url, reg) {
+      setRegistration(reg);
       if (!reg) return;
-      const check = () => void reg.update().catch(() => undefined);
+      // Look whenever the app comes back to the screen or online, and every 30 minutes.
+      const check = () => void checkForUpdate();
       document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+      window.addEventListener('online', check);
       setInterval(check, 30 * 60 * 1000);
     },
   });
-  // A new version found while the app is still opening is installed straight away: nothing has
-  // been typed yet, so nothing can be lost. Later on, the engineer chooses when.
+
   useEffect(() => {
-    if (needRefresh && performance.now() < 20_000) void updateServiceWorker(true);
+    if (!needRefresh) return;
+    const apply = () => {
+      if (safeToUpdate()) void updateServiceWorker(true);
+    };
+    apply();
+    // Not safe yet (a sheet or field in use, the camera open): try again shortly and on return.
+    const timer = setInterval(apply, 3000);
+    document.addEventListener('visibilitychange', apply);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', apply);
+    };
   }, [needRefresh, updateServiceWorker]);
+
   if (!needRefresh) return null;
   return (
     <div className="toast-wrap" style={{ top: 'auto', bottom: 'calc(84px + var(--safe-bottom))', pointerEvents: 'auto' }}>
@@ -29,10 +42,7 @@ export function UpdatePrompt() {
         <RefreshCw />
         <span>A new version is ready.</span>
         <button className="btn btn-sm btn-accent" onClick={() => updateServiceWorker(true)}>
-          Update
-        </button>
-        <button className="btn btn-sm btn-ghost" style={{ color: 'inherit' }} onClick={() => setNeedRefresh(false)}>
-          Later
+          Update now
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { Copy, HardDrive, ShieldCheck, Trash2 } from 'lucide-react';
+import { Copy, HardDrive, Loader2, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { checkForUpdate } from '../app/updates';
 import { useEffect, useState } from 'react';
 import { MachineLists } from '../components/MachineLists';
 import { TabBar } from '../components/TabBar';
@@ -14,6 +15,7 @@ export function Settings() {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [wipe, setWipe] = useState(false);
   const [problems, setProblems] = useState(readProblems);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   async function refresh() {
     try {
@@ -101,10 +103,22 @@ export function Settings() {
             <dt>Build</dt>
             <dd className="mono">{__APP_BUILD__}</dd>
             <dt>Sign-in</dt>
-            <dd>None. Your phone lock protects the data.</dd>
+            <dd>Team code, once per phone</dd>
             <dt>Where data lives</dt>
             <dd>Only on this phone</dd>
           </dl>
+          <button
+            className="btn btn-sm"
+            disabled={checkingUpdate}
+            onClick={async () => {
+              setCheckingUpdate(true);
+              const found = await checkForUpdate();
+              setCheckingUpdate(false);
+              toast(found ? 'Installing the new version…' : 'You have the latest version.', found ? 'good' : 'info');
+            }}
+          >
+            {checkingUpdate ? <Loader2 className="spin" /> : <RefreshCw />} Check for updates
+          </button>
           <div className="stack" style={{ gap: 8 }}>
             <b className="small">Problem log</b>
             {problems.length ? (

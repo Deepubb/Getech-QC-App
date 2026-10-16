@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { markCapture } from '../app/updates';
 
 /**
  * Opens the phone camera or gallery for a target and hands back the files. The input is clicked
@@ -12,6 +13,7 @@ export function useCamera<T>(onFiles: (files: File[], target: T) => Promise<void
 
   const open = (t: T, from: 'camera' | 'gallery' = 'camera') => {
     target.current = t;
+    markCapture(true);
     (from === 'camera' ? cam : gallery).current?.click();
   };
 
@@ -19,12 +21,14 @@ export function useCamera<T>(onFiles: (files: File[], target: T) => Promise<void
     const files = list ? [...list] : [];
     const t = target.current;
     target.current = null;
-    if (!files.length || t === null) return;
+    if (!files.length || t === null) return markCapture(false);
     setBusy(true);
     try {
       await onFiles(files, t);
     } finally {
       setBusy(false);
+      // Only now may an update reload the app: the photo is saved.
+      markCapture(false);
     }
   }
 
