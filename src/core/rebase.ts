@@ -27,19 +27,25 @@ export interface Rebased {
  * as one removed and one added, so its photos stay under the old name.
  */
 export function rebaseOnList(current: EvidenceFolder[], list: ListFolder[]): Rebased {
-  const old = new Map<string, { folder: EvidenceFolder; item: EvidenceItem }>();
-  for (const f of current) for (const i of f.items) old.set(key(f.name, i.path, i.name), { folder: f, item: i });
+  // Items waiting to be matched, per name, in list order: a name the list repeats is matched
+  // one occurrence at a time, so each copy keeps its own photos.
+  const queues = new Map<string, EvidenceItem[]>();
+  for (const f of current) {
+    for (const i of f.items) {
+      const k = key(f.name, i.path, i.name);
+      queues.set(k, [...(queues.get(k) ?? []), i]);
+    }
+  }
   const used = new Set<string>();
   let added = 0;
 
   const folders: EvidenceFolder[] = list.map((lf) => {
     const existing = current.find((f) => f.name.trim().toLowerCase() === lf.name.trim().toLowerCase());
     const items = lf.shots.map((s): EvidenceItem => {
-      const k = key(lf.name, s.path, s.name);
-      const match = old.get(k);
-      if (match && !used.has(k)) {
-        used.add(k);
-        return { ...match.item, path: s.path, name: s.name, extra: false };
+      const match = queues.get(key(lf.name, s.path, s.name))?.shift();
+      if (match) {
+        used.add(match.id);
+        return { ...match, path: s.path, name: s.name, extra: false };
       }
       added++;
       return { id: uid(), path: s.path, name: s.name, extra: false, na: false, photos: [] };
@@ -51,8 +57,7 @@ export function rebaseOnList(current: EvidenceFolder[], list: ListFolder[]): Reb
   let kept = 0;
   for (const f of current) {
     for (const i of f.items) {
-      const k = key(f.name, i.path, i.name);
-      if (used.has(k)) continue;
+      if (used.has(i.id)) continue;
       if (!i.photos.length && !i.extra) {
         removed++;
         continue;

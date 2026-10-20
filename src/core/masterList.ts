@@ -46,23 +46,12 @@ export function sheetToList(sheetName: string, rows: unknown[][]): ParsedList | 
       continue;
     }
     seenFolders.add(name.toLowerCase());
-    const shots: ListShot[] = [];
-    const seen = new Set<string>();
-    for (const cell of cells) {
-      const shot = parseCell(cell);
-      if (!shot) continue;
-      const key = shotKey(shot);
-      if (seen.has(key)) {
-        warnings.push(`${name}: "${[...shot.path, shot.name].join(' > ')}" is listed twice; kept once.`);
-        continue;
-      }
-      seen.add(key);
-      shots.push(shot);
-    }
-    if (shots.length) folders.push({ name, shots });
-    else warnings.push(`${name} has no photo names, so it was left out.`);
+    // Every row is kept as written, repeats included; a repeated name is numbered in the zip.
+    // A heading with nothing under it stays as an empty folder.
+    const shots = cells.map(parseCell).filter((s): s is ListShot => !!s);
+    folders.push({ name, shots });
   }
-  return folders.length ? { machine, folders, warnings } : null;
+  return folders.some((f) => f.shots.length) ? { machine, folders, warnings } : null;
 }
 
 export const shotCount = (l: Pick<MasterList, 'folders'>) => l.folders.reduce((a, f) => a + f.shots.length, 0);
@@ -82,10 +71,24 @@ export function fillFixture(text: string, ft: string): string {
 /** How a name with {fixture} reads before an FT number is given: "End Effector_[FT]". */
 export const showFixture = (text: string) => text.replace(PLACEHOLDER, '[FT]');
 
-/** What uploading a new version of a list changes, counted by folder/subfolder/name. */
+/** What uploading a new version of a list changes, counted by folder/subfolder/name (repeats count each time). */
 export function diffLists(before: Pick<MasterList, 'folders'>, after: Pick<MasterList, 'folders'>) {
-  const keys = (l: Pick<MasterList, 'folders'>) => new Set(l.folders.flatMap((f) => f.shots.map((s) => `${f.name.toLowerCase()}/${shotKey(s)}`)));
-  const a = keys(before);
-  const b = keys(after);
-  return { added: [...b].filter((k) => !a.has(k)).length, removed: [...a].filter((k) => !b.has(k)).length };
+  const counts = (l: Pick<MasterList, 'folders'>) => {
+    const m = new Map<string, number>();
+    for (const f of l.folders) for (const s of f.shots) {
+      const k = `${f.name.toLowerCase()}/${shotKey(s)}`;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  };
+  const a = counts(before);
+  const b = counts(after);
+  let added = 0;
+  let removed = 0;
+  for (const k of new Set([...a.keys(), ...b.keys()])) {
+    const d = (b.get(k) ?? 0) - (a.get(k) ?? 0);
+    if (d > 0) added += d;
+    else removed -= d;
+  }
+  return { added, removed };
 }

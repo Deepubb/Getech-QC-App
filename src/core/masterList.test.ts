@@ -42,10 +42,10 @@ describe('sheetToList', () => {
     const esd = list.folders[3].shots;
     expect(esd.filter((s) => s.name === 'EPSON_Loader').map((s) => s.path)).toEqual([['ESD'], ['Ground']]);
   });
-  it('drops a repeated name with a warning', () => {
-    const l = sheetToList('M', [['Safety'], ['E-stop'], ['e-stop']])!;
-    expect(l.folders[0].shots).toHaveLength(1);
-    expect(l.warnings[0]).toMatch(/listed twice/);
+  it('keeps every row as written, repeats included, and keeps an empty column as an empty folder', () => {
+    const l = sheetToList('M', [['Safety', 'Function Verification'], ['RPP > Belt', ''], ['RPP > Belt', '']])!;
+    expect(l.folders.map((f) => [f.name, f.shots.length])).toEqual([['Safety', 2], ['Function Verification', 0]]);
+    expect(l.warnings).toEqual([]);
   });
   it('skips a sheet with no headings', () => {
     expect(sheetToList('Empty', [])).toBeNull();
@@ -66,6 +66,8 @@ describe('diffLists', () => {
     const before = sheetToList('M', [['A', 'B'], ['x', 'y']])!;
     const after = sheetToList('M', [['A', 'B'], ['x', 'z'], ['w', '']])!;
     expect(diffLists(before, after)).toEqual({ added: 2, removed: 1 });
+    // A name added a second time counts as added.
+    expect(diffLists(before, sheetToList('M', [['A', 'B'], ['x', 'y'], ['x', '']])!)).toEqual({ added: 1, removed: 0 });
   });
 });
 

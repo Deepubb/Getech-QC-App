@@ -105,6 +105,16 @@ describe('name clashes', () => {
     expect(zipClashes(bad)).toEqual(['F/A_2.jpg']);
     expect(zipClashes(e)).toEqual([]);
   });
+  it('numbers a name the list repeats, so both copies land in the zip', () => {
+    const e = set([['ESD Measurement', [item('1', 'Loader Tray Conveyor Belt', ['RPP'], ['a']), item('2', 'Loader Tray Conveyor Belt', ['RPP'], ['b', 'c'])]]]);
+    expect(zipEntries(e).map((z) => z.path)).toEqual([
+      'ESD Measurement/RPP/Loader Tray Conveyor Belt.jpg',
+      'ESD Measurement/RPP/Loader Tray Conveyor Belt_2.jpg',
+      'ESD Measurement/RPP/Loader Tray Conveyor Belt_3.jpg',
+    ]);
+    expect(photoFileNames(e.folders[0].items[1], e.folders[0])).toEqual(['Loader Tray Conveyor Belt_2.jpg', 'Loader Tray Conveyor Belt_3.jpg']);
+    expect(zipClashes(e)).toEqual([]);
+  });
   it('numbers extra photos of one item', () => {
     expect(photoFileNames(item('x', 'CCTV', [], ['a', 'b', 'c']))).toEqual(['CCTV.jpg', 'CCTV_2.jpg', 'CCTV_3.jpg']);
   });

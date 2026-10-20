@@ -82,6 +82,7 @@ worker/
 - The sheet name is the machine name (for example `SSDLV`).
 - Row 1 holds the main folders. Every cell below a heading is one photo for that folder.
 - `A > B` puts photo `B` in subfolder `A`. Without `>`, the cell is the photo name.
+- Every row is kept as written. A name the list repeats becomes a second photo to take and is saved as `Name_2.jpg`. A heading with nothing under it stays as an empty folder.
 - `{fixture}` is a fixture's FT number. After taking such a photo the app asks for its FT number; one name can have photos for many fixtures (`Gripper_FT01.jpg`, `Gripper_FT02.jpg`).
 
 The zip for the table above, for machine `SSDLV133` and fixture `FT07`, is `SSDLV133.zip`:

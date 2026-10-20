@@ -37,12 +37,12 @@ export function FolderScreen() {
   return <FolderView key={folder.id} e={e} folder={folder} />;
 }
 
-const findItem = (evidenceId: string, folderId: string, itemId: string) =>
+const findFolder = (evidenceId: string, folderId: string) =>
   useApp
     .getState()
     .evidence.find((x) => x.id === evidenceId)
-    ?.folders.find((f) => f.id === folderId)
-    ?.items.find((i) => i.id === itemId);
+    ?.folders.find((f) => f.id === folderId);
+const findItem = (evidenceId: string, folderId: string, itemId: string) => findFolder(evidenceId, folderId)?.items.find((i) => i.id === itemId);
 
 function FolderView({ e, folder }: { e: EvidenceSet; folder: EvidenceFolder }) {
   const nav = useNavigate();
@@ -61,7 +61,7 @@ function FolderView({ e, folder }: { e: EvidenceSet; folder: EvidenceFolder }) {
   const savedToast = (itemId: string, photoId: string) => {
     const item = findItem(e.id, folder.id, itemId);
     const at = item?.photos.findIndex((x) => x.id === photoId) ?? -1;
-    if (item && at >= 0) toast(`Saved ${photoFileNames(item)[at]}`, 'good');
+    if (item && at >= 0) toast(`Saved ${photoFileNames(item, findFolder(e.id, folder.id))[at]}`, 'good');
   };
 
   const camera = useCamera<Target>(async (files, t) => {
@@ -131,6 +131,7 @@ function FolderView({ e, folder }: { e: EvidenceSet; folder: EvidenceFolder }) {
             <div className="list">
               {g.items.map((i) => (
                 <ItemRow
+                  folder={folder}
                   key={i.id}
                   item={i}
                   isNext={i.id === next?.id}
@@ -228,7 +229,21 @@ function FolderView({ e, folder }: { e: EvidenceSet; folder: EvidenceFolder }) {
   );
 }
 
-function ItemRow({ item, isNext, busy, onTap, onMore }: { item: EvidenceItem; isNext: boolean; busy: boolean; onTap: () => void; onMore: () => void }) {
+function ItemRow({
+  folder,
+  item,
+  isNext,
+  busy,
+  onTap,
+  onMore,
+}: {
+  folder: EvidenceFolder;
+  item: EvidenceItem;
+  isNext: boolean;
+  busy: boolean;
+  onTap: () => void;
+  onMore: () => void;
+}) {
   const n = item.photos.length;
   const latest = item.photos[n - 1];
   const fixture = needsFt(item);
@@ -254,7 +269,7 @@ function ItemRow({ item, isNext, busy, onTap, onMore }: { item: EvidenceItem; is
             {n ? (
               <span className="ok-text">
                 <Check size={13} style={{ verticalAlign: '-2px' }} />{' '}
-                {fixture ? (fts.length ? fts.join(', ') : plural(n, 'photo')) : n > 1 ? plural(n, 'photo') : photoFileNames(item)[0]}
+                {fixture ? (fts.length ? fts.join(', ') : plural(n, 'photo')) : n > 1 ? plural(n, 'photo') : photoFileNames(item, folder)[0]}
               </span>
             ) : item.na ? (
               'Not applicable'
@@ -357,7 +372,7 @@ function ItemSheet({
   const [photo, setPhoto] = useState<{ p: EvidencePhoto; index: number } | null>(null);
   const [remove, setRemove] = useState(false);
   const name = itemName(item);
-  const names = photoFileNames(item);
+  const names = photoFileNames(item, folder);
   const fixture = needsFt(item);
   const setNa = (na: boolean) =>
     updateEvidence(e.id, (d) => {

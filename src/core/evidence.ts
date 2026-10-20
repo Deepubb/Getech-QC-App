@@ -15,18 +15,29 @@ const photoPath = (item: Pick<EvidenceItem, 'path'>, photo: Pick<EvidencePhoto, 
   item.path.map((p) => safeName(fillFixture(p, photo.ft ?? ''))).filter(Boolean);
 
 /**
- * File names for every photo of an item: the name with that photo's FT number filled in, then
- * "_2", "_3" when the same name repeats ("CCTV.jpg", "CCTV_2.jpg"; "Gripper_FT01.jpg", "Gripper_FT02.jpg").
+ * File names for every photo in a folder: the name with that photo's FT number filled in, then
+ * "_2", "_3" whenever the same name comes up again in the same place, whether as another photo of
+ * one item or as a name the list repeats ("CCTV.jpg", "CCTV_2.jpg"; "Gripper_FT01.jpg", "Gripper_FT02.jpg").
  */
-export function photoFileNames(item: Pick<EvidenceItem, 'name' | 'path' | 'photos'>): string[] {
+export function folderFileNames(folder: Pick<EvidenceFolder, 'items'>): Map<string, string> {
   const seen = new Map<string, number>();
-  return item.photos.map((p) => {
-    const base = safeName(fillFixture(item.name, p.ft ?? ''));
-    const key = [...photoPath(item, p), base].join('/').toLowerCase();
-    const n = (seen.get(key) ?? 0) + 1;
-    seen.set(key, n);
-    return `${base}${n > 1 ? `_${n}` : ''}.jpg`;
-  });
+  const out = new Map<string, string>();
+  for (const item of folder.items) {
+    for (const p of item.photos) {
+      const base = safeName(fillFixture(item.name, p.ft ?? ''));
+      const key = [...photoPath(item, p), base].join('/').toLowerCase();
+      const n = (seen.get(key) ?? 0) + 1;
+      seen.set(key, n);
+      out.set(p.id, `${base}${n > 1 ? `_${n}` : ''}.jpg`);
+    }
+  }
+  return out;
+}
+
+/** File names of one item's photos, numbered within its folder when given. */
+export function photoFileNames(item: EvidenceItem, folder?: Pick<EvidenceFolder, 'items'>): string[] {
+  const names = folderFileNames(folder ?? { items: [item] });
+  return item.photos.map((p) => names.get(p.id) ?? '');
 }
 
 /** Where a photo goes inside the zip, e.g. "Machine Verification/EPSON". */
@@ -94,10 +105,10 @@ export interface ZipEntry {
 /** Every photo at "<Folder>/<Subfolder>/<Name>.jpg". Nothing else goes in the zip. */
 export function zipEntries(e: EvidenceSet): ZipEntry[] {
   return e.folders.flatMap((folder) =>
-    folder.items.flatMap((item) => {
-      const names = photoFileNames(item);
-      return item.photos.map((photo, i) => ({ path: `${photoFolder(folder, item, photo)}/${names[i]}`, item, photo }));
-    }),
+    {
+      const names = folderFileNames(folder);
+      return folder.items.flatMap((item) => item.photos.map((photo) => ({ path: `${photoFolder(folder, item, photo)}/${names.get(photo.id)}`, item, photo })));
+    },
   );
 }
 

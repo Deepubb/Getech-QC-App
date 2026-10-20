@@ -50,6 +50,15 @@ describe('rebaseOnList', () => {
   });
 });
 
+describe('repeated names', () => {
+  it('keeps each copy of a repeated name with its own photos', () => {
+    const cur: EvidenceFolder[] = [{ id: 'f', name: 'ESD', items: [item('a', 'Belt', ['RPP'], 1), item('b', 'Belt', ['RPP'], 2)] }];
+    const r = rebaseOnList(cur, [{ name: 'ESD', shots: [{ path: ['RPP'], name: 'Belt' }, { path: ['RPP'], name: 'Belt' }] }]);
+    expect(r.folders[0].items.map((i) => [i.id, i.photos.length])).toEqual([['a', 1], ['b', 2]]);
+    expect(hasChanges(r)).toBe(false);
+  });
+});
+
 describe('listHash', () => {
   it('changes when the list changes', () => {
     expect(listHash(list)).toBe(listHash(structuredClone(list)));
