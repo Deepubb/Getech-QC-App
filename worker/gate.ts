@@ -105,7 +105,42 @@ button{min-height:50px;border:0;border-radius:12px;background:#59ac8c;color:#0f2
   return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
 }
 
+/**
+ * Served as /sw.js to an installed app that checks for updates without the team code: typically
+ * one installed before the code existed, which opens from its saved copy and so never sees the
+ * code page. It replaces that copy with nothing (every request goes to the server, so the next
+ * screen is the code page) and moves windows on screen to the code page now. After the code, the
+ * app loads normally and installs the real service worker again. Photos in the app's storage are
+ * not touched. If the code turns out to be valid after all (a browser that leaves cookies off
+ * this one request), it removes itself instead, so a phone with the code is never sent round.
+ */
+export const LOCKED_SW = `// GeTech QC: this phone needs the team code before it can update.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  const claimed = self.clients.claim();
+  event.waitUntil(claimed);
+  // Not inside waitUntil: these navigations are served once activation has finished.
+  claimed
+    .then(() => fetch('/api/master', { cache: 'no-store' }))
+    .then((r) => {
+      if (r.status !== 401) return self.registration.unregister();
+      return self.clients.matchAll({ type: 'window' }).then((windows) =>
+        windows
+          .filter((w) => w.visibilityState === 'visible')
+          .forEach((w) => w.navigate('/unlock?next=' + encodeURIComponent(new URL(w.url).pathname)).catch(() => undefined)),
+      );
+    })
+    .catch(() => undefined);
+});
+`;
+
+const isWorkerScript = (request: Request) =>
+  request.headers.get('service-worker') === 'script' || request.headers.get('sec-fetch-dest') === 'serviceworker';
+
 const locked = (request: Request, code: string) => {
+  if (code && new URL(request.url).pathname === '/sw.js' && isWorkerScript(request)) {
+    return new Response(LOCKED_SW, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   if (isPage(request)) {
     const url = new URL(request.url);
     return Response.redirect(`${url.origin}/unlock?next=${encodeURIComponent(url.pathname + url.search)}`, 302);

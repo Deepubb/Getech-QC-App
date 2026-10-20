@@ -97,6 +97,19 @@ describe('team code gate', () => {
     expect(html).toContain('TEAM_CODE');
   });
 
+  it('sends an app that updates without the code to the code page, without unlocking anything', async () => {
+    const sw = await worker.fetch(new Request('https://qc.example/sw.js', { headers: { 'service-worker': 'script' } }), env());
+    expect(sw.status).toBe(200);
+    const script = await sw.text();
+    expect(script).toContain("navigate('/unlock?next='");
+    expect(script).toContain('registration.unregister()');
+    expect(script).not.toContain(CODE);
+    // Fetched any other way, /sw.js stays locked; with the code, the real one is served.
+    expect((await worker.fetch(new Request('https://qc.example/sw.js'), env())).status).toBe(401);
+    const cookie = cookieFrom(await worker.fetch(unlock(CODE), env()));
+    expect(await (await worker.fetch(new Request('https://qc.example/sw.js', { headers: { 'service-worker': 'script', cookie } }), env())).text()).toBe('APP');
+  });
+
   it('lets nobody in when the code has not been set up', async () => {
     const e = env({ TEAM_CODE: undefined });
     expect((await worker.fetch(page('/'), e)).status).toBe(302);

@@ -43,7 +43,8 @@ Nothing is served until the team code is entered. Set it in the Worker: **Settin
 - A correct entry sets an HttpOnly cookie for a year. It holds a signature made with the code, never the code itself.
 - Changing `TEAM_CODE` signs every phone out; the app then shows **Enter team code**. Photos already on phones stay.
 - Ten wrong tries from one address lock it out for 15 minutes.
-- Without `TEAM_CODE`, nobody gets in. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
+- Without `TEAM_CODE`, nobody gets in.
+- An installed app that checks for updates without the code (e.g. one installed before the code existed) is sent a stand-in service worker that takes it to the code page; after the code, the real app and its offline copy come back. Photos on the phone are untouched. The Excel is read on the publisher's device; only machine, folder and photo names are sent. The previous list is kept in KV under `master:previous`.
 
 To try it locally: `npm run build`, put `TEAM_CODE=<any test code>` in `.dev.vars` (ignored by git), then `npx wrangler dev`.
 
