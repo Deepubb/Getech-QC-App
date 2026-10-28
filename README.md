@@ -4,7 +4,7 @@ Installable web app (PWA) for QC buyoff photo evidence on iPhone and Android.
 
 1. On a PC, open the app, go to **Settings** and **publish** the team master Excel. Each sheet is one machine, named after the sheet. Every phone picks up the new list when the app opens.
 2. Start photo evidence for a machine and type its machine number (e.g. `SSDLV133`).
-3. Tap each photo name and take the photo; the app names it. Items can be marked not applicable, get extra photos (`_2`, `_3`) or be added on site.
+3. Tap each photo name and take the photo; the app names it. Items can be marked not applicable, get extra photos (`Name (1).jpg`, `Name (2).jpg`, the way Windows numbers files) or be added on site.
 4. Export one zip laid out like the sheet. It splits automatically above a size limit (90 MB by default) so each part fits WhatsApp.
 
 There is no login and no server. Everything is stored in the browser (IndexedDB) on the phone until it is exported.
@@ -62,7 +62,7 @@ src/
 ├── app/          App shell, routes, first-run and install gates
 ├── core/         Types, master list reading, naming and zip paths (pure, unit-tested)
 ├── data/         IndexedDB access (db.ts), the app store (store.ts), team list fetch/publish (remote.ts)
-├── camera/       Photo resize, time stamp, EXIF removal
+├── camera/       16:9 crop (up to 4096 px), time stamp, EXIF removal
 ├── export/       Evidence zip builder, split planning, share and download
 ├── components/   Shared UI (app bar, sheets, toasts, thumbnails, camera, machine lists)
 └── screens/      One file per screen
@@ -82,7 +82,7 @@ worker/
 - The sheet name is the machine name (for example `SSDLV`).
 - Row 1 holds the main folders. Every cell below a heading is one photo for that folder.
 - `A > B` puts photo `B` in subfolder `A`. Without `>`, the cell is the photo name.
-- Every row is kept as written. A name the list repeats becomes a second photo to take and is saved as `Name_2.jpg`. A heading with nothing under it stays as an empty folder.
+- Every row is kept as written. A name the list repeats becomes a second photo to take and is numbered with it: `Name (1).jpg`, `Name (2).jpg`. A name with one photo stays `Name.jpg`. A heading with nothing under it stays as an empty folder.
 - `{fixture}` is a fixture's FT number. After taking such a photo the app asks for its FT number; one name can have photos for many fixtures (`Gripper_FT01.jpg`, `Gripper_FT02.jpg`).
 
 The zip for the table above, for machine `SSDLV133` and fixture `FT07`, is `SSDLV133.zip`:

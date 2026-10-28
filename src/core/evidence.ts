@@ -15,21 +15,26 @@ const photoPath = (item: Pick<EvidenceItem, 'path'>, photo: Pick<EvidencePhoto, 
   item.path.map((p) => safeName(fillFixture(p, photo.ft ?? ''))).filter(Boolean);
 
 /**
- * File names for every photo in a folder: the name with that photo's FT number filled in, then
- * "_2", "_3" whenever the same name comes up again in the same place, whether as another photo of
- * one item or as a name the list repeats ("CCTV.jpg", "CCTV_2.jpg"; "Gripper_FT01.jpg", "Gripper_FT02.jpg").
+ * File names for every photo in a folder, the way Windows numbers a group of files: the name with
+ * that photo's FT number filled in, and when the same name comes up more than once in the same
+ * place (several photos of one item, or a name the list repeats) every copy gets " (1)", " (2)", …
+ * ("CCTV.jpg" alone; "CCTV (1).jpg", "CCTV (2).jpg" together; "Gripper_FT01.jpg", "Gripper_FT02.jpg").
  */
 export function folderFileNames(folder: Pick<EvidenceFolder, 'items'>): Map<string, string> {
+  const photos = folder.items.flatMap((item) =>
+    item.photos.map((p) => {
+      const base = safeName(fillFixture(item.name, p.ft ?? ''));
+      return { id: p.id, base, key: [...photoPath(item, p), base].join('/').toLowerCase() };
+    }),
+  );
+  const total = new Map<string, number>();
+  for (const p of photos) total.set(p.key, (total.get(p.key) ?? 0) + 1);
   const seen = new Map<string, number>();
   const out = new Map<string, string>();
-  for (const item of folder.items) {
-    for (const p of item.photos) {
-      const base = safeName(fillFixture(item.name, p.ft ?? ''));
-      const key = [...photoPath(item, p), base].join('/').toLowerCase();
-      const n = (seen.get(key) ?? 0) + 1;
-      seen.set(key, n);
-      out.set(p.id, `${base}${n > 1 ? `_${n}` : ''}.jpg`);
-    }
+  for (const p of photos) {
+    const n = (seen.get(p.key) ?? 0) + 1;
+    seen.set(p.key, n);
+    out.set(p.id, `${p.base}${total.get(p.key)! > 1 ? ` (${n})` : ''}.jpg`);
   }
   return out;
 }

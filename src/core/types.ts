@@ -38,7 +38,7 @@ export interface EvidencePhoto {
 
 /**
  * One photo name from the list (or added on site when `extra`). Its photos are saved as
- * "<name>.jpg", then "<name>_2.jpg", "<name>_3.jpg".
+ * "<name>.jpg", or "<name> (1).jpg", "<name> (2).jpg" when there is more than one.
  */
 export interface EvidenceItem {
   id: string;

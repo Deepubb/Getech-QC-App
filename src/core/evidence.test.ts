@@ -33,9 +33,9 @@ describe('FT numbers per photo', () => {
   });
   it('names each photo with its own FT number, numbering repeats', () => {
     expect(photoFileNames(gripper)).toEqual([
-      'Loader Robot_Gripper_FT01.jpg',
+      'Loader Robot_Gripper_FT01 (1).jpg',
       'Loader Robot_Gripper_FT02.jpg',
-      'Loader Robot_Gripper_FT01_2.jpg',
+      'Loader Robot_Gripper_FT01 (2).jpg',
       'Loader Robot_Gripper_{fixture}.jpg',
     ]);
   });
@@ -52,11 +52,11 @@ describe('zipEntries', () => {
     ['Machine Verification', [item('1', 'CCTV', [], ['a']), item('2', 'Loader Robot Specification', ['EPSON'], ['b', 'c']), item('3', 'KVM 1', ['KVM'])]],
     ['Function Verification', [item('4', 'ET_Inspection_{fixture}_ResultOK', ['Vision Master'], [], { photos: [ph('d', 'FT07')] })]],
   ]);
-  it('puts photos at Folder/Name.jpg, or Folder/Subfolder/Name.jpg, with _2 for extra photos', () => {
+  it('puts photos at Folder/Name.jpg, or Folder/Subfolder/Name.jpg, numbering extra photos (1), (2)', () => {
     expect(zipEntries(e).map((z) => z.path)).toEqual([
       'Machine Verification/CCTV.jpg',
-      'Machine Verification/EPSON/Loader Robot Specification.jpg',
-      'Machine Verification/EPSON/Loader Robot Specification_2.jpg',
+      'Machine Verification/EPSON/Loader Robot Specification (1).jpg',
+      'Machine Verification/EPSON/Loader Robot Specification (2).jpg',
       'Function Verification/Vision Master/ET_Inspection_FT07_ResultOK.jpg',
     ]);
   });
@@ -65,8 +65,8 @@ describe('zipEntries', () => {
       '├─ Machine Verification/',
       '│  ├─ CCTV.jpg',
       '│  └─ EPSON/',
-      '│     ├─ Loader Robot Specification.jpg',
-      '│     └─ Loader Robot Specification_2.jpg',
+      '│     ├─ Loader Robot Specification (1).jpg',
+      '│     └─ Loader Robot Specification (2).jpg',
       '└─ Function Verification/',
       '   └─ Vision Master/',
       '      └─ ET_Inspection_FT07_ResultOK.jpg',
@@ -101,21 +101,22 @@ describe('name clashes', () => {
     expect(nameClash(e.folders[0], ['EPSON'], 'CCTV')).toBe(false);
   });
   it('blocks export when two photos would get the same file', () => {
-    const bad = set([['F', [item('1', 'A', [], ['a', 'b']), item('2', 'A_2', [], ['c'], { extra: true })]]]);
-    expect(zipClashes(bad)).toEqual(['F/A_2.jpg']);
+    const bad = set([['F', [item('1', 'A', [], ['a', 'b']), item('2', 'A (2)', [], ['c'], { extra: true })]]]);
+    expect(zipClashes(bad)).toEqual(['F/A (2).jpg']);
     expect(zipClashes(e)).toEqual([]);
   });
   it('numbers a name the list repeats, so both copies land in the zip', () => {
     const e = set([['ESD Measurement', [item('1', 'Loader Tray Conveyor Belt', ['RPP'], ['a']), item('2', 'Loader Tray Conveyor Belt', ['RPP'], ['b', 'c'])]]]);
     expect(zipEntries(e).map((z) => z.path)).toEqual([
-      'ESD Measurement/RPP/Loader Tray Conveyor Belt.jpg',
-      'ESD Measurement/RPP/Loader Tray Conveyor Belt_2.jpg',
-      'ESD Measurement/RPP/Loader Tray Conveyor Belt_3.jpg',
+      'ESD Measurement/RPP/Loader Tray Conveyor Belt (1).jpg',
+      'ESD Measurement/RPP/Loader Tray Conveyor Belt (2).jpg',
+      'ESD Measurement/RPP/Loader Tray Conveyor Belt (3).jpg',
     ]);
-    expect(photoFileNames(e.folders[0].items[1], e.folders[0])).toEqual(['Loader Tray Conveyor Belt_2.jpg', 'Loader Tray Conveyor Belt_3.jpg']);
+    expect(photoFileNames(e.folders[0].items[1], e.folders[0])).toEqual(['Loader Tray Conveyor Belt (2).jpg', 'Loader Tray Conveyor Belt (3).jpg']);
     expect(zipClashes(e)).toEqual([]);
   });
-  it('numbers extra photos of one item', () => {
-    expect(photoFileNames(item('x', 'CCTV', [], ['a', 'b', 'c']))).toEqual(['CCTV.jpg', 'CCTV_2.jpg', 'CCTV_3.jpg']);
+  it('numbers photos of one item the Windows way, and leaves a single photo unnumbered', () => {
+    expect(photoFileNames(item('x', 'CCTV', [], ['a']))).toEqual(['CCTV.jpg']);
+    expect(photoFileNames(item('x', 'CCTV', [], ['a', 'b', 'c']))).toEqual(['CCTV (1).jpg', 'CCTV (2).jpg', 'CCTV (3).jpg']);
   });
 });
